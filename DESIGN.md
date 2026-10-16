@@ -30,8 +30,9 @@
 |---|---|---|
 | `maxEUInput()` | `V[energyTier]` | `MTEHatchEnergy.java:70-72` 原本是 `V[mTier]` |
 | `maxEUStore()` | `512 + V[energyTier] × 4 × amperage` | 照抄 `MTEHatchEnergyMulti.java:124-126` |
-| `maxAmperesIn()` | `amperage + (amperage >> 2)` | 照抄 `MTEHatchEnergyMulti.java:129-131` |
+| `maxAmperesIn()` | `amperage + (amperage >> 2)` | 照抄 `MTEHatchEnergyMulti.java:129-131`；这 1/4 是**进线接受能力**的损耗余量，不进配方预算（见下） |
 | `maxWorkingAmperesIn()` | `amperage` | 照抄 `MTEHatchEnergyMulti.java:133-136` |
+| `getInputTier()` | `energyTier` | `MTETieredMachineBlock.java:75-78` 默认返回 `mTier`；GT 的 `getInputVoltageTier()`、WAILA 的 energyTier 标签、`BaseMetaTileEntity.dischargeItem()` 都读它，不覆写则永远按 LV 上报 |
 | `getTierForStructure()` | `structureTier` | `MTEHatch.java:151-153` 默认返回 `mTier`；该 hook 的 javadoc 明说用于"结构检查用自定义 tier，`mTier` 保留作他用" |
 | `getTexturesActive/Inactive()` | 按 `amperage` 选 `OVERLAYS_ENERGY_IN_MULTI_{2A,4A,16A,64A}`，索引 `energyTier + 1` | `MTEHatchEnergy.java:39-47` 硬编码 2A；选法照 `MTEHatchEnergyMulti.java:63-91` |
 
@@ -41,10 +42,30 @@
 `512 + V×8` 不含安培数，所以电流档位一旦超过约 8~12，预算再大也拿不到 —— 这正是
 `MTEHatchEnergyMulti` 把 buffer 写成 `512 + V×4×A` 的原因。
 
+**预算到底怎么算（与「V × A」的出入）**：`setProcessingLogicPower`（`MTEMultiBlockBase.java:1020-1025`）
+把 `availableVoltage = getAverageInputVoltage()`（各能源仓 `getInputVoltage()` 的**平均**）与
+`availableAmperage = getMaxInputAmps()` 交给 `ProcessingLogic`。而 `getMaxInputAmps()`
+（`MTEMultiBlockBase.java:1474-1476`）走 `ExoticEnergyInputHelper.getMaxWorkingInputAmpsMulti`，
+即各仓 `maxWorkingAmperesIn()` —— **电流档位本身**。于是：
+
+- 单仓：预算 = `V[energyTier]` × 1A（`useSingleAmp` 硬写，与电流档位无关）；
+- 多仓：预算 = 各仓电压**平均值** × ΣA（各仓同 tier 同档位时就是 `V × nA`）。
+
+混 tier 时这个值会高于任何线缆实际能供的电，`ProcessingLogic` 据此选中一个永远喂不饱的配方，
+机器从此卡住不动（README 限制 4）。本模组不修正该算法 —— 修正它需要 Mixin，与零依赖取向冲突。
+
+**别搞混的两个近似同名方法**：`ExoticEnergyInputHelper` 里另有
+`getMaxInputAmpsMulti`（走 `getBaseMetaTileEntity().getInputAmperage()` = `maxAmperesIn()` = A + A/4）。
+它**不进**配方预算，只被 `MTEMultiBlockBase.getMaxInputPower()`（`:1485-1492`）等路径使用 ——
+所以「16A 档在预算里按 20A 算」是错的，16A 就是 16A。
+
 **为什么不用反射改 `mTier`**：`mTier` 是 final 字段，上游唯一先例是
 `tectech/util/TTUtility.java:50-68` 的反射改写，且那段代码自带
 `// TODO why is it using reflection to change a final field from GREGTECH ?`。
-本模组改为覆写所有读 `mTier` 的方法，不碰 final 字段。
+本模组改为覆写影响行为的读者（`maxEUInput()`、`getTierForStructure()`、`getInputTier()`），不碰 final 字段。
+`getOutputTier()` 与 `getTileEntityBaseType()` 仍读到 `mTier`（恒为 LV），但本仓没有输出侧
+（`isEnetOutput()` 为 false）、扳手等级也无实际影响，故不覆写 —— 覆写它们只是让注释更好看，
+不改变任何行为。
 
 **外壳贴图**：装入多方块时 `addEnergyInputToMachineList` 会调 `hatch.updateTexture(aBaseCasingIndex)`
 （`MTEMultiBlockBase.java:2006-2009`），把外壳换成**机器**的外壳（`MTEHatch.java:59-80` 走
@@ -67,6 +88,9 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
 2. 单能源仓且无 exotic 仓时，GT 把可用电流硬写成 1A（`useSingleAmp`，`MTEMultiBlockBase.java:1021`），
    电流档位不参与预算。这是原版设计，本模组不绕过（绕过需要 Mixin，与"零依赖"取向冲突）。
 3. 结构等级设错 → 机器解散/停机（方块保留）；"要求 ≥ 某 tier"的机器需相应调高结构等级。
+4. 多个可变仓混用不同供电等级 → 预算按各仓电压的**平均值** × ΣA 算（不是各仓之和），
+   可能远高于线缆实际能供的电；机器选中跑不动的配方后**卡住不动且无任何诊断**。
+   多个可变仓应设成同一供电等级（见第 3 节"预算到底怎么算"）。
 
 ## 6. 刻意不做
 
@@ -85,15 +109,28 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
 - [x] `NumericWidget.setGetter(() -> (double) x)` 类型匹配。
 - [x] `getDescriptionData()` / `onDescriptionPacket()` 覆写签名正确；`mDescriptionArray`/`mTextures` 在子类可访问。
 - [x] `MetaTileEntityIDs.ENERGY_HATCH_LV.ID` 与 `GameRegistry.addShapedRecipe` 用法可用。
+- [x] `NumericWidget.setValidator(DoubleUnaryOperator)` 存在且返回 `NumericWidget`（可继续串链）。
+- [x] `IGregTechTileEntity.markDirty()` 可解析（GT 自己的 `MTEBasicTank.java:206` 在同样的静态类型上调用）。
+- [x] `getInputTier()` 可覆写（`MTETieredMachineBlock.java:75-78` 的实现不是 final）。
 
 **仍待验证（编译管不到）**
-- [ ] `IGregTechTileEntity.issueTileUpdate()` 是否足以让 NBT 落盘；若不足，在 `onSettingsChanged()` 补 `markDirty()`。
+- [x] `issueTileUpdate()` **不足以**让 NBT 落盘：它只置 `mNeedsTileUpdate` → `worldObj.markBlockForUpdate`
+      （`BaseMetaTileEntity.java:367-370`），是纯客户端同步路径。已在 `onSettingsChanged()` 补 `markDirty()`。
+- [x] 描述包链路完整、改档能同步到客户端：`getDescriptionData()` → `getDescriptionPacket()`
+      → 客户端 `onDataPacket()` → `onDescriptionPacket()`（`CommonBaseMetaTileEntity.java:254/269/299`）。
 - [ ] `usesMixins = false` 下 `runClient` 开发环境是否需要 `forceEnableMixins = true`（生产环境不需要）。
 
 **功能相关**
-- [ ] 物品图标与 GT 创造栏条目：`ItemMachines` 的图标取法需确认；若创造栏看不到，需显式加入 GT 创造栏。
-- [ ] 电流档位改为真正的循环/下拉控件（当前是数字框 + 吸附到最近档位）。可考虑 ModularUI 的
-      `CycleButtonWidget`（API 需确认）。
+- [x] 物品图标与 GT 创造栏条目：`BlockMachines.getSubBlocks`（`:671-677`）枚举全部非空 MTE，
+      物品会**自动**出现在 GT 主创造栏，无需显式注册；图标取原型实例（`mTier = BASE_TIER = 1`）的外壳，
+      即 LV 机壳。
+- [ ] 电流档位改为真正的循环/下拉控件（当前是数字框 + 吸附）。可考虑 ModularUI 的
+      `CycleButtonWidget`（API 需确认）。**吸附本身已修**：控件改用 `setValidator` 吸附，
+      `validateAndSetValue` 会先跑 validator 再写回文本框，所以显示值与 `getInfoData` 不再互相矛盾；
+      但滚轮步长 1/4/16 与档位 {1,2,4,16,64} 仍对不齐（多数滚动看着像没反应），归入本待办。
+- [ ] 信息面板 / WAILA 的 tier 名本地化：现取 `GTValues.VOLTAGE_NAMES` 的英文长名
+      （如 "Ultra Low Voltage"），中文客户端下这一项仍是英文，格式也与其它 GT 机器不一致。
+      应改用 GT 的本地化 helper（`GTUtility.getColoredTierNameFromTier` / `GTValues.getLocalizedLongVoltageName`）。
 - [ ] tooltip 中文本地化：当前 `DESCRIPTION` 是构造期英文字面量（避免 lang 加载时机问题）；
       若要中文，改为 lang key + 在 preInit 用 `GTLanguageManager.addStringLocalization` 注册，并验证 NEI 显示时机。
 
@@ -101,7 +138,8 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
 1. 单仓 + 供电等级 MV / 电流 2：与原版 MV 能源仓逐项比对（`maxEUInput`/`maxEUStore`/`maxAmperesIn`/预算）。
 2. 单仓切 HV/EV：确认机器能选中并跑更高 EU/t 的配方，超频层数符合 `log4(预算/配方EU/t)`。
 3. 单仓切高 tier 但不配高 tier 供电 → 应 `POWER_LOSS`（证明"供电必须配套"）。
-4. 两个可变仓：电流档位生效，预算 = `V × ΣA`。
+4. 两个可变仓、**设成同一供电等级**：电流档位生效，预算 = `V × ΣA`（两仓同为 A 档即 `V × 2A`）。
+   再把两仓故意设成不同供电等级，确认出现「配方选中但卡住」的失真现象（限制 4）。
 5. 结构：塞进 EBF（结构等级 LV 应通过）；塞进大型聚变（应被拒）→ 把结构等级调到它要求的值（应通过）。
 6. 切档后结构重检：调低结构等级 → 机器解散；调回 → 恢复（依赖 GT 自身的周期结构重检）。
 7. 存档重启后三个值保持；客户端贴图/信息面板与所选值一致。
