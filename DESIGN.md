@@ -5,8 +5,17 @@
 
 ## 1. 目标
 
-多方块只装**一个**能源仓时，也能跑任意等级的配方。原版做不到：结构对能源仓的 tier 有区间限制，
-且电气 tier 就是结构 tier。本模组把两者解耦。
+多方块只装**一个**能源仓时，也能跑任意等级的配方，并在 GUI 里随时调整供电 tier 与电流。
+
+**早期假设需要修正**：原先写的"原版做不到：结构对能源仓的 tier 有区间限制，且电气 tier 就是结构 tier"
+只对少数机器成立 —— GT5U 绝大多数多方块的成型判定**不检查**能源仓 tier（见第 3 节"结构检查到底看什么"）。
+本模组的实际价值因此落在：
+
+1. **一个物品覆盖全部 tier × 电流档位**（原版要按 tier × 安培备几十个能源仓）；
+2. 在少数显式读 `getTierForStructure()` 的机器上（goodgenerator 大型聚变、大型流体提取机）
+   把结构 tier 与电气 tier 解耦；
+3. `getInputTier()` 随供电等级上报，WAILA/TOP 的机器读数与实际电压一致
+   （原版仓不存在这个问题，因为它们本来就不解耦）。
 
 一句话要求：**让"控制配方的工作电压来改变执行速度"这件事有一个方块可做。**
 
@@ -59,6 +68,26 @@
 它**不进**配方预算，只被 `MTEMultiBlockBase.getMaxInputPower()`（`:1485-1492`）等路径使用 ——
 所以「16A 档在预算里按 20A 算」是错的，16A 就是 16A。
 
+**结构检查到底看什么（本模组最大的一个认知修正）**：成型判定走 StructureLib 的 `IStructureElement.check()`，
+而 GT 的仓室元素（`HatchElementBuilder.build()`，`HatchElementBuilder.java:429-438`）只做一件事：
+把方块交给 `mAdder`，即 `MTEMultiBlockBase.addEnergyInputToMachineList`（`:2006-2009`），
+它只判断 `instanceof MTEHatchEnergy` —— **成型路径上没有任何 tier 判断**。
+`GTStructureUtility.filterByMTETier`（`:751-762`，那个"区间检查"）挂在 `hatchItemFilter` 上，
+只影响 `couldBeValid()`（结构提示粒子、自动放置）与 `getBlocksToPlace()`，不参与成型。
+所以 `getTierForStructure()` 的调用点，就是本项功能的**全部**适用范围：
+
+| 调用点 | 行为 | 对本仓 |
+|---|---|---|
+| `goodgenerator/.../MTELargeFusionComputer.java:483/487` | 仓 tier < 要求 → 结构不成立 | **生效**（唯一要求"≥ 某 tier"的机器） |
+| `MTELargeFluidExtractor.java:177` | 玻璃 tier < UEV 时，仓 tier > 玻璃 tier → 结构不成立 | **生效**（上界约束） |
+| `GTStructureUtility.java:756`（经 item filter） | 只影响提示 / 自动放置 | 不参与成型 |
+| gtpp 化工厂 / 精炼厂 / 核反应堆 | 同上；`:179-196` 查的是 dynamo 与输入/输出仓，不是能源仓 | 不参与成型 |
+| `MTEFusionComputer.java:233` | 不用 `getTierForStructure()`，**直接比 `mTier`** | **无条件被拒**（本仓 `mTier` 恒为 LV） |
+| `MTEWormholeGenerator.java:275` | 只把 `MTEHatchEnergyMulti` 认作能源仓 | 根本装不进去 |
+
+结论：结构等级对 EBF/LCR 这类机器是空操作；对 GT 自家聚变族则完全无能为力 —— 那三台读 `mTier`，
+而 `mTier` 是 final 字段，正是本模组刻意不改的东西。这是"不反射改 final 字段"取舍的代价。
+
 **为什么不用反射改 `mTier`**：`mTier` 是 final 字段，上游唯一先例是
 `tectech/util/TTUtility.java:50-68` 的反射改写，且那段代码自带
 `// TODO why is it using reflection to change a final field from GREGTECH ?`。
@@ -87,10 +116,15 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
 1. 往下切供电等级 → 进线电压高于申报电压即爆炸（`BaseMetaTileEntity.java:1758-1762`）。
 2. 单能源仓且无 exotic 仓时，GT 把可用电流硬写成 1A（`useSingleAmp`，`MTEMultiBlockBase.java:1021`），
    电流档位不参与预算。这是原版设计，本模组不绕过（绕过需要 Mixin，与"零依赖"取向冲突）。
-3. 结构等级设错 → 机器解散/停机（方块保留）；"要求 ≥ 某 tier"的机器需相应调高结构等级。
+3. 结构等级只在少数机器上生效（见第 3 节"结构检查到底看什么"）：goodgenerator 大型聚变要求"仓 tier ≥ 某值"、
+   大型流体提取机要求"仓 tier ≤ 玻璃 tier"。设错 → 结构检查失败、回到未成型（方块保留），调回去即恢复。
+   其余机器（含 EBF/LCR）拨它没有任何效果 —— 那不是 bug。
 4. 多个可变仓混用不同供电等级 → 预算按各仓电压的**平均值** × ΣA 算（不是各仓之和），
    可能远高于线缆实际能供的电；机器选中跑不动的配方后**卡住不动且无任何诊断**。
    多个可变仓应设成同一供电等级（见第 3 节"预算到底怎么算"）。
+5. GT 自家聚变 MK1/2/3 与虫洞发生器**不接受本仓**：前者直接比较 `mTier`（`MTEFusionComputer.java:233`），
+   本仓 `mTier` 恒为 LV（final，刻意不改）→ 无条件被拒，调结构等级无效；后者只把
+   `MTEHatchEnergyMulti` 认作能源仓（`MTEWormholeGenerator.java:275`）。这两处请用原版/tectech 仓。
 
 ## 6. 刻意不做
 
@@ -140,7 +174,10 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
 3. 单仓切高 tier 但不配高 tier 供电 → 应 `POWER_LOSS`（证明"供电必须配套"）。
 4. 两个可变仓、**设成同一供电等级**：电流档位生效，预算 = `V × ΣA`（两仓同为 A 档即 `V × 2A`）。
    再把两仓故意设成不同供电等级，确认出现「配方选中但卡住」的失真现象（限制 4）。
-5. 结构：塞进 EBF（结构等级 LV 应通过）；塞进大型聚变（应被拒）→ 把结构等级调到它要求的值（应通过）。
-6. 切档后结构重检：调低结构等级 → 机器解散；调回 → 恢复（依赖 GT 自身的周期结构重检）。
+5. 结构（一次验完第 3 节的结论）：EBF —— 结构等级拨到任何值都应通过（EBF 不看仓 tier）；
+   goodgenerator 大型聚变 —— 低于它要求的 tier 应被拒，调到要求值应通过；GT 聚变 MK1 —— 任何值都应被拒。
+6. 结构重检：在大型流体提取机里把结构等级调到高于玻璃 tier → 结构应失效；调回 → 恢复
+   （依赖 GT 自身的周期结构重检：`onPostTick` 里 `mUpdate` 每 50 tick 触发一次 `checkStructure`，
+   `MTEMultiBlockBase.java:589-593`）。
 7. 存档重启后三个值保持；客户端贴图/信息面板与所选值一致。
 8. GTSWN 覆盖板贴在本仓上，配 V/A ≥ 预算 → 无线供电成立，网络按 (1+损耗) 扣账。
