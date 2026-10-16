@@ -32,7 +32,10 @@ import gregtech.api.util.GTUtility;
  * <li>数值公式照抄 {@code MTEHatchEnergyMulti}（含 buffer 随电流放大，否则多仓场景下
  * 每 tick 抽取会被 buffer 卡住）；</li>
  * <li>{@code mTier} 在 GT5U 是 final 字段，故不反射改写（原版唯一先例 {@code TTUtility.setTier}
- * 自己也挂着"为什么要反射改 final 字段"的 TODO），改为覆写所有读 mTier 的方法。</li>
+ * 自己也挂着"为什么要反射改 final 字段"的 TODO），改为覆写影响行为的读者：{@code maxEUInput()}
+ * （全部电气数值由它派生）、{@code getTierForStructure()}、{@code getInputTier()}。
+ * {@code getOutputTier()} 与 {@code getTileEntityBaseType()} 仍读到 mTier，但本仓没有输出侧、
+ * 扳手等级也无实际影响，故不覆写。</li>
  * </ul>
  * 已知限制：多方块只有一个能源仓且无 exotic 仓时，GT 的 {@code setProcessingLogicPower}
  * 会把可用电流硬写成 1A（{@code useSingleAmp}），此时本仓的电流档位不参与功率预算。
@@ -100,6 +103,18 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
     @Override
     public long maxWorkingAmperesIn() {
         return amperage;
+    }
+
+    /**
+     * 覆写 {@code MTETieredMachineBlock} 对 mTier 的直读。GT 的
+     * {@code MTEMultiBlockBase.getInputVoltageTier()}、WAILA 的 energyTier 标签，以及
+     * {@code BaseMetaTileEntity.dischargeItem()} 都走这里；不覆写则不论选了什么供电等级，
+     * 上报出去的机器 tier 永远是 BASE_TIER(LV)，与实际电压自相矛盾。
+     * 语义与 {@code MetaTileEntity.getInputTier()}（由上报电压反推）一致。
+     */
+    @Override
+    public long getInputTier() {
+        return energyTier;
     }
 
     // ------------------------------------------------------------------
@@ -274,6 +289,9 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
             })
                 .setGetter(() -> (double) amperage)
                 .setBounds(AMPERAGE_STEPS[0], AMPERAGE_STEPS[AMPERAGE_STEPS.length - 1])
+                // 吸附放在 validator 里：validateAndSetValue 会先跑 validator，再把结果写回文本框，
+                // 所以控件显示的值与仓实际存的值不可能互相矛盾（setter 里的吸附留作二重保险）
+                .setValidator(val -> (double) snapAmperage((int) val))
                 .setScrollValues(1, 4, 16)
                 .setTextAlignment(Alignment.Center)
                 .setTextColor(Color.WHITE.normal)
@@ -291,6 +309,9 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
         if (base != null && base.isServerSide()) {
             // 覆盖层贴图与信息面板依赖这两个值，推一次方块更新让客户端跟上
             base.issueTileUpdate();
+            // issueTileUpdate 只走客户端同步（markBlockForUpdate），不标脏。
+            // 这三项要落盘（见 saveNBTData），不标脏则改档可能随 chunk 保存一起丢失
+            base.markDirty();
         }
     }
 

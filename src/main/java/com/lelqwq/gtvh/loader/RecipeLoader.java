@@ -3,6 +3,8 @@ package com.lelqwq.gtvh.loader;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 
+import com.lelqwq.gtvh.GTVariableEnergyHatch;
+
 import cpw.mods.fml.common.registry.GameRegistry;
 import gregtech.api.GregTechAPI;
 import gregtech.api.enums.MetaTileEntityIDs;
@@ -20,10 +22,19 @@ public final class RecipeLoader {
     private RecipeLoader() {}
 
     public static void run() {
-        if (MachineLoader.VARIABLE_ENERGY_HATCH == null) return;
+        if (MachineLoader.VARIABLE_ENERGY_HATCH == null) {
+            GTVariableEnergyHatch.LOG.warn("Variable Energy Hatch MTE is missing; skipping recipe registration.");
+            return;
+        }
 
         ItemStack lvEnergyHatch = lvEnergyHatch();
-        if (lvEnergyHatch == null) return;
+        if (lvEnergyHatch == null) {
+            // 静默 return 会让「配方不出现」看起来像玩家摆错了形状，必须留下痕迹
+            GTVariableEnergyHatch.LOG.warn(
+                "LV energy hatch (MTE id {}) is missing; skipping recipe registration.",
+                MetaTileEntityIDs.ENERGY_HATCH_LV.ID);
+            return;
+        }
 
         GameRegistry.addShapedRecipe(
             MachineLoader.VARIABLE_ENERGY_HATCH.getStackForm(1),
