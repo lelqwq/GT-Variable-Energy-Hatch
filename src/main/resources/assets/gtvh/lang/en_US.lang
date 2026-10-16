@@ -1,0 +1,8 @@
+# 显示名：由 MTE 构造器以 basicName 推导出的键 gt.blockmachines.<mName>.name
+# （mName = "Variable Energy Hatch".replace(' ','_').toLowerCase()）
+gt.blockmachines.variable_energy_hatch.name=Variable Energy Hatch
+
+# GUI 标签
+gtvh.gui.structure_tier=Structure tier
+gtvh.gui.power_tier=Power tier
+gtvh.gui.amperage=Amperage

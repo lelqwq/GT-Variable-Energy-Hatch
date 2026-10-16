@@ -1,0 +1,5 @@
+gt.blockmachines.variable_energy_hatch.name=可变能源仓
+
+gtvh.gui.structure_tier=结构等级
+gtvh.gui.power_tier=供电等级
+gtvh.gui.amperage=电流

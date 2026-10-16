@@ -1,0 +1,7 @@
+// Add any additional repositories for your dependencies here.
+
+repositories {
+	// Allow resolving artifacts from the developer's local Maven repo if needed
+	mavenLocal()
+
+}

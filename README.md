@@ -1,0 +1,87 @@
+# Variable Energy Hatch（可变能源仓）
+
+一个 GTNH 2.8.4 / GT5U 5.09.51 的小型 addon：**一个方块顶掉能源仓的 tier 选择题**。
+
+多方块只装一个能源仓、又想跑更高等级的配方时，原版的办法是拆机器换更高级的仓、或者堆更多仓。
+本模组把这件事收进一个方块：结构等级、供电等级、电流三项都在它自己的 GUI 里切。
+
+- **纯 GT5U 扩展**：没有 Mixin，**不需要 UniMixins**，没有自定义网络包，运行时只依赖 GT5U 本身。
+- **一个方块**：`Variable Energy Hatch`，继承 `MTEHatchEnergy`，因此任何接受普通能源仓的多方块都认它。
+
+## 使用方法
+
+右键方块打开 GUI，三项即时生效：
+
+| 项 | 默认 | 可选 | 作用 |
+|---|---|---|---|
+| 结构等级 Structure tier | LV | ULV..UXV(0..13) | **决定这台机器认不认它**。GT 的结构元素用 `getTierForStructure()` 做区间检查 |
+| 供电等级 Power tier | LV | ULV..UXV(0..13) | 它向机器申报的电压 = `V[供电等级]`，也就是这台机器的功率预算上限 |
+| 电流 Amperage | 1A | {1, 2, 4, 16, 64} | 申报的工作电流（**只在机器有 2 个以上能源仓时进入预算**，见下） |
+
+关键理解：**机器的功率预算 = 供电等级 × 电流**，而 GT 的超频层数由预算决定
+（`log4(预算 / 配方 EU/t)`，每层时间 ÷2、EU/t ×4）。所以"选供电等级"等价于"控制配方的工作电压"。
+
+结构等级与供电等级**互相独立**：可以把结构等级设在 LV 塞进一台 MV 机器，同时把供电等级设到 UV
+—— 这正是本模组存在的意义（原版做不到，因为结构 tier 就是电气 tier）。
+
+## 三条必须知道的限制
+
+1. **往下切有爆炸风险**。GT 的进线判定是 `进线电压 > getInputVoltage()` 就炸
+   （`BaseMetaTileEntity.java:1758-1762`）。把供电等级切到低于现有供电电压时，下一次进包就炸仓。
+2. **单仓时电流档位不生效**。GT 的 `setProcessingLogicPower` 在"恰好一个能源仓且无 exotic 仓"时
+   把可用电流硬写成 1A（`MTEMultiBlockBase.java:1021`）。此时预算 = 供电等级 × 1A，与电流档位无关。
+   电流要参与预算，机器上得有 ≥2 个能源仓（或另有 exotic 仓）。
+3. **结构等级设错会让机器解散/停机**。GT 多方块结构检查失败是回到未成型状态（方块保留），
+   把值调回去即恢复。另有少数机器要求"能源仓 tier ≥ 某值"（例如大型聚变，
+   `MTELargeFusionComputer.java:483/487`），这批机器必须把结构等级调到它要求的值才装得进去。
+
+## 配方
+
+工作台 3×3，中心一件 **LV 能源仓**，四周 8 格 **原版拉杆**：
+
+```
+拉杆 拉杆 拉杆
+拉杆 仓   拉杆
+拉杆 拉杆 拉杆
+```
+
+成本极低且 LV 就能做 —— 属于"早期就替代全部能源仓选择"的强力工具，这是刻意的设计取舍；
+若要加门槛，只改中心件为更高 tier 的能源仓即可（形状不用动）。
+
+## 与 GT-Simple-Wireless-Network 的配合
+
+不需要任何跨模组代码。GTSWN 的无线能源覆盖板是往任意 `BaseMetaTileEntity` 调
+`increaseStoredEnergyUnits` 灌电，并且按宿主的 `getEUCapacity()` 决定补多少
+（`GTswn_Cover_EnergyWireless.java:121-123`），而本仓的容量随供电等级自动变化。
+所以把 GTSWN 覆盖板贴在本仓上，配置电压 = 供电等级、电流足够大，就能**无线**喂饱它
+（网络照扣 1+损耗）。
+
+## 构建
+
+- **必须 Java 25**（`.java-version`）。
+- 编译目标 `GT5U 5.09.51.476`（= GTNH 2.8.4，实机 .482）。
+- `./gradlew build`，产物 `build/libs/gtvariablehatch-<版本>.jar`（只发主 jar，不带 `-dev`/`-sources`）。
+- **改版本时三处同改**：`gradle.properties` 的 `RELEASE_VERSION`、`src/main/resources/mcmod.info` 的 `version`、
+  `@Mod` 注解（`Tags` 自动）。GTNH 模板**不替换** mcmod.info，游戏 Mods 界面显示的就是它，改完必须重编。
+
+## 当前状态
+
+**骨架已完成并编译通过**：`./gradlew build` 成功，产物 `build/libs/gtvariablehatch-0.1.0.jar`，
+jar 内 `Tags.VERSION` 与 `mcmod.info` 的版本均为 `0.1.0`（三处版本号已对齐）。
+
+已写：构建脚本、主类、MTE 本体（三个可调项 + 全部覆写 + NBT/描述包 + 信息面板 + GUI）、注册、配方、中英 lang、mcmod.info。
+
+**尚未验证**（`DESIGN.md` 第 7 节有完整清单）：游戏内实际行为（8 条实测清单一条都没跑）、
+物品图标与 GT 创造栏条目、GUI 的档位交互（当前是数字框 + 吸附）、tooltip 中文本地化、runClient 开发环境。
+
+## 目录
+
+```
+src/main/java/com/lelqwq/gtvh/
+├── GTVariableEnergyHatch.java              主类（preInit 构造 MTE，init 注册配方）
+├── common/api/enums/MetaTileEntityID.java  MTE ID（BASE 15000，避开 GTSWN 的 14600 段）
+├── common/machine/VariableEnergyHatch.java 方块本体
+└── loader/{MachineLoader,RecipeLoader}.java
+```
+
+工程细节、GT5U 行号依据与未决项都在 [`DESIGN.md`](DESIGN.md)。
