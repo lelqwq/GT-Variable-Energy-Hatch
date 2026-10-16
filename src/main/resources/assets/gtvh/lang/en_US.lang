@@ -6,3 +6,11 @@ gt.blockmachines.variable_energy_hatch.name=Variable Energy Hatch
 gtvh.gui.structure_tier=Structure tier
 gtvh.gui.power_tier=Power tier
 gtvh.gui.amperage=Amperage
+
+# 鼠标悬停提示（%s 由代码填入档位/电压/电流）
+gtvh.gui.structure_tier.tooltip=Structure tier %s
+gtvh.gui.power_tier.tooltip=Power tier %s
+gtvh.gui.power_tier.tooltip.warn=Explodes if the incoming cable voltage exceeds it
+gtvh.gui.amperage.tooltip=Amperage %s
+gtvh.gui.shift_hint.tier=Shift + click = change 4 tiers at once
+gtvh.gui.shift_hint.amperage=Shift + click = jump straight to 1A / 64A

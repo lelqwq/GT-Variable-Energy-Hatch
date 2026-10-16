@@ -29,9 +29,40 @@
 | 上限 | `V[13] = 536,870,912 EU/t` | `GTValues.java:99-102`；14 是 `Integer.MAX_VALUE-7` 的防越界假 tier、15 是错误 tier，都不进选择器 |
 | 电流档位 | {1, 2, 4, 16, 64}，默认 1 | 对应覆盖层 2A/4A/16A/64A 与原版真实仓型 |
 | 默认值 | 结构 LV / 供电 LV / 1A | |
-| GUI | 右键打开 | ModularUI 1.x，与 GT 自己的 hatch 同一套（非新增依赖） |
+| GUI | 右键打开；窗口 **176×211**；三项只读显示 + 左右箭头调节 | ModularUI 1.x，与 GT 自己的 hatch 同一套（非新增依赖）；高度由布局推出，见下方"GUI 为什么要加高" |
 | 存取 | NBT 三键 + GT 原生描述包 | 无自定义网络包 |
 | 依赖 | 仅 GT5U（编译期另需 AE2/ModularUI/ModularUI2/GTNHLib/StructureLib 可见性） | 无 Mixin、无 UniMixins |
+
+### GUI 为什么要加高（176×166 → 176×211）
+
+GT 默认窗口是 176×166（`IMetaTileEntity.getGUIWidth/getGUIHeight` 的默认值），玩家背包由
+`BaseTileEntity.bindPlayerInventoryUI`（`:652-654`）贴在窗口底部：`bindPlayerInventory(player, 7, …)`
+→ 落点 `(width/2 - 81, height - 7 - 76)`，即 176 宽时背包占 `y = 83..159`。而"标题 + 控件行"三组
+竖排至少要 ~120px，塞进 83px 的剩余空间必然压背包 —— 这正是 0.1.0 用
+`y = getGUIHeight()/5 - 7` 起头、每组 `+44` 时出现的症状（后两组落在 y=70/86 与 y=114/130）。
+
+修法：把窗口高度改成**由布局反推**（`CONTENT_BOTTOM + 83`），控件位置全部来自同一组常量，
+两边不可能再撞上。背包不用手动摆放 —— GT 按窗口高度自动重定位，`CONTENT_BOTTOM` 取 128 与默认
+落点严格相等。背景用的是可拉伸九宫格（`AdaptableUITexture`，`GTUITextures.java:20`），加高不糊贴图；
+先例 `MTEHatchInputBusME.getGUIHeight()` 返回 179、`MTEMultiBlockBase` 用 198×192。
+
+### 控件行：`[−][只读数值框][+]`
+
+每行 110px（`18 + 2 + 70 + 2 + 18`）水平居中，其中数值框 70px 恰好也居中，所以标题与框同轴。
+数值框是 **`TextWidget` + `setStringSupplier`**（不是 `TextFieldWidget`/`NumericWidget`）：
+
+- **只能靠箭头改**。箭头是 `ButtonWidget` + `GTUITextures.BUTTON_STANDARD` + 大号 `−`/`+` 覆盖层，
+  写法与 `MTETeleporter`、`MTEHatchCraftingInputME` 一致。`SyncedWidget` 会自动把点击同步到服务端，
+  两侧各跑一次同一段 setter（夹取/吸附只写在 `setStructureTier/setEnergyTier/setAmperage` 一处，
+  NBT 读档与箭头共用），所以不存在"控件显示值 ≠ 仓存储值"。
+- **显示值跟随仓里的值**，不自己存一份。`TextWidget.setTextSupplier` 的 supplier 只在客户端求值，
+  每 tick 在 `onScreenUpdate` 里重读（`ModularWindow.update()`），值由 GT 原生描述包同步到客户端。
+  顺带解掉了 0.1.0 的待办：电流档位不再是"数字框 + 吸附 + 对不齐的滚轮步长"，箭头直接沿
+  `AMPERAGE_STEPS` 走（1→2→4→16→64，两端夹住）。
+- 框里显示 `1 · LV` / `2 · MV` / `1 A`（等级用 `GTValues.VN` 短名，不带颜色码，白字在灰底上可读）；
+  电压与预算（`V[tier] EU/t`、`V × A`）放在 tooltip，避免 `536,870,912` 这类长数字撑破 70px。
+- Shift + 点击：等级一次 ±4，电流直接跳到 1A / 64A。箭头按到边界后再点只是重复写同一个值。
+
 
 ## 3. 数值来源（逐个方法）
 
@@ -139,13 +170,18 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
 - GTNH 启用 Spotless 格式检查：新文件先跑 `./gradlew spotlessApply` 再 build，否则格式违规会让 build 失败。
 
 **编译已验证的 API 假设**
-- [x] `GTValues.VOLTAGE_NAMES` 可访问（`getInfoData`/`tierName` 用到）。
-- [x] `NumericWidget.setGetter(() -> (double) x)` 类型匹配。
+- [x] `GTValues.VOLTAGE_NAMES` / `GTValues.VN` 可访问（`getInfoData` 用长名，GUI 用短名）。
 - [x] `getDescriptionData()` / `onDescriptionPacket()` 覆写签名正确；`mDescriptionArray`/`mTextures` 在子类可访问。
 - [x] `MetaTileEntityIDs.ENERGY_HATCH_LV.ID` 与 `GameRegistry.addShapedRecipe` 用法可用。
-- [x] `NumericWidget.setValidator(DoubleUnaryOperator)` 存在且返回 `NumericWidget`（可继续串链）。
 - [x] `IGregTechTileEntity.markDirty()` 可解析（GT 自己的 `MTEBasicTank.java:206` 在同样的静态类型上调用）。
 - [x] `getInputTier()` 可覆写（`MTETieredMachineBlock.java:75-78` 的实现不是 final）。
+- [x] `ButtonWidget.setOnClick(BiConsumer<ClickData, Widget>)` + `setBackground(BUTTON_STANDARD, OVERLAY_BUTTON_{PLUS,MINUS}_LARGE)`
+      可用（照 GT 自己的 `MTETeleporter.java:517-527`）；`ClickData.shift` 会随点击包一起发到服务端。
+- [x] `TextWidget.setStringSupplier(Supplier<String>)` 可链式返回 `TextWidget`；`dynamicTooltip(Supplier<List<String>>)`
+      与 `setUpdateTooltipEveryTick(true)` 可用（后者必须有：tooltip 结果默认缓存，不设会停在第一次的值上）。
+- [x] **别把继承来的 setter 挂在链尾**：`setSize`/`setPos`/`setBackground` 声明返回 `Widget`，
+      `setTextAlignment`→`BaseTextFieldWidget`、`setTextColor`→`TextFieldWidget`，串起来会把静态类型降级，
+      要么逐句调用，要么把链尾喂给 `builder.widget(...)`（参数类型是 `Widget`）。
 
 **仍待验证（编译管不到）**
 - [x] `issueTileUpdate()` **不足以**让 NBT 落盘：它只置 `mNeedsTileUpdate` → `worldObj.markBlockForUpdate`
@@ -158,10 +194,10 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
 - [x] 物品图标与 GT 创造栏条目：`BlockMachines.getSubBlocks`（`:671-677`）枚举全部非空 MTE，
       物品会**自动**出现在 GT 主创造栏，无需显式注册；图标取原型实例（`mTier = BASE_TIER = 1`）的外壳，
       即 LV 机壳。
-- [ ] 电流档位改为真正的循环/下拉控件（当前是数字框 + 吸附）。可考虑 ModularUI 的
-      `CycleButtonWidget`（API 需确认）。**吸附本身已修**：控件改用 `setValidator` 吸附，
-      `validateAndSetValue` 会先跑 validator 再写回文本框，所以显示值与 `getInfoData` 不再互相矛盾；
-      但滚轮步长 1/4/16 与档位 {1,2,4,16,64} 仍对不齐（多数滚动看着像没反应），归入本待办。
+- [x] 电流档位改为真正的循环控件：已改成 `[−][只读显示][+]`，箭头沿 `AMPERAGE_STEPS` 走
+      （1→2→4→16→64），Shift+点击直接到两端。顺带解掉了"数字框 + 吸附 + 滚轮步长对不齐"那一串问题：
+      没有输入框就没有显示值与存储值不一致的可能，也没有滚轮。可继续考虑 `CycleButtonWidget`
+      （一次点击循环全部档位，省掉 4 次点击），但当前形态与 GT 传送机手感一致，暂不改。
 - [ ] 信息面板 / WAILA 的 tier 名本地化：现取 `GTValues.VOLTAGE_NAMES` 的英文长名
       （如 "Ultra Low Voltage"），中文客户端下这一项仍是英文，格式也与其它 GT 机器不一致。
       应改用 GT 的本地化 helper（`GTUtility.getColoredTierNameFromTier` / `GTValues.getLocalizedLongVoltageName`）。
@@ -181,3 +217,5 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
    `MTEMultiBlockBase.java:589-593`）。
 7. 存档重启后三个值保持；客户端贴图/信息面板与所选值一致。
 8. GTSWN 覆盖板贴在本仓上，配 V/A ≥ 预算 → 无线供电成立，网络按 (1+损耗) 扣账。
+9. GUI 布局：三组「标题 + 数字框」完整落在窗口上半部，**不压玩家背包**，背包 4 行全部可见可点
+   （窗口 176×211，数值推导见第 2 节，仅经源码推算、未实机确认）。

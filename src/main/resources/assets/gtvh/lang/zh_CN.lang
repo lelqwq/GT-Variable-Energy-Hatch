@@ -3,3 +3,11 @@ gt.blockmachines.variable_energy_hatch.name=可变能源仓
 gtvh.gui.structure_tier=结构等级
 gtvh.gui.power_tier=供电等级
 gtvh.gui.amperage=电流
+
+# 鼠标悬停提示（%s 由代码填入档位/电压/电流）
+gtvh.gui.structure_tier.tooltip=结构等级 %s
+gtvh.gui.power_tier.tooltip=供电等级 %s
+gtvh.gui.power_tier.tooltip.warn=进线电压高于它会爆炸
+gtvh.gui.amperage.tooltip=电流 %s
+gtvh.gui.shift_hint.tier=Shift + 点击箭头 = 一次调 4 级
+gtvh.gui.shift_hint.amperage=Shift + 点击箭头 = 直接切到 1A / 64A
