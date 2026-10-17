@@ -10,4 +10,4 @@ gtvh.gui.power_tier.tooltip=供电等级 %s
 gtvh.gui.power_tier.tooltip.warn=进线电压高于它会爆炸
 gtvh.gui.amperage.tooltip=电流 %s
 gtvh.gui.shift_hint.tier=Shift + 点击箭头 = 一次调 4 级
-gtvh.gui.shift_hint.amperage=Shift + 点击箭头 = 直接切到 1A / 64A
+gtvh.gui.shift_hint.amperage=Shift + 点击箭头 = 直接切到 2A / 64A

@@ -116,7 +116,7 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
 
     private int structureTier = 1; // LV
     private int energyTier = 1; // LV
-    private int amperage = 1;
+    private int amperage = 2;
 
     public VariableEnergyHatch(int aID, String aName, String aNameRegional) {
         super(aID, aName, aNameRegional, BASE_TIER, 0, DESCRIPTION);
@@ -418,7 +418,7 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
         return energyTier + " · " + shortTierName(energyTier);
     }
 
-    /** 电流：「1 A」 */
+    /** 电流：「2 A」 */
     private String amperageDisplay() {
         return amperage + " A";
     }
@@ -502,7 +502,7 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
         return AMPERAGE_STEPS[amperageIndex(value)];
     }
 
-    /** 沿 AMPERAGE_STEPS 走一档（1→2→4→16→64），两端夹住不回绕 */
+    /** 沿 AMPERAGE_STEPS 走一档（2→4→16→64），两端夹住不回绕 */
     private static int stepAmperage(int current, int direction) {
         int index = Math.max(0, Math.min(AMPERAGE_STEPS.length - 1, amperageIndex(current) + direction));
         return AMPERAGE_STEPS[index];
