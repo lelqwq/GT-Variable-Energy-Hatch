@@ -53,8 +53,8 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
     public static final int MIN_TIER = 0;
     public static final int MAX_TIER = 13;
 
-    /** 电流可选档位（对应原版 2A/4A/16A/64A 覆盖层与 1A 默认档） */
-    public static final int[] AMPERAGE_STEPS = { 1, 2, 4, 16, 64 };
+    /** 电流可选档位（对应原版 2A/4A/16A/64A） */
+    public static final int[] AMPERAGE_STEPS = { 2, 4, 16, 64 };
 
     /** 构造期固定 tier：仅用于未接入多方块时的外壳贴图回退与物品图标 */
     private static final int BASE_TIER = 1;
