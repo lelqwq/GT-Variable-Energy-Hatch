@@ -111,12 +111,16 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
     private static final String NBT_ENERGY_TIER = "energyTier";
     private static final String NBT_AMPERAGE = "amperage";
 
+    private static final int DEFAULT_STRUCTURE_TIER = 1;
+    private static final int DEFAULT_ENERGY_TIER = 1;
+    private static final int DEFAULT_AMPERAGE = 2;
+
     private static final String[] DESCRIPTION = { "Right-click to configure.", "",
         "WARNING: if the incoming cable voltage exceeds the power tier, this hatch explodes." };
 
-    private int structureTier = 1; // LV
-    private int energyTier = 1; // LV
-    private int amperage = 2;
+    private int structureTier = DEFAULT_STRUCTURE_TIER; // LV
+    private int energyTier = DEFAULT_ENERGY_TIER; // LV
+    private int amperage = DEFAULT_AMPERAGE;
 
     public VariableEnergyHatch(int aID, String aName, String aNameRegional) {
         super(aID, aName, aNameRegional, BASE_TIER, 0, DESCRIPTION);
@@ -216,6 +220,15 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
         aNBT.setInteger(NBT_STRUCTURE_TIER, structureTier);
         aNBT.setInteger(NBT_ENERGY_TIER, energyTier);
         aNBT.setInteger(NBT_AMPERAGE, amperage);
+    }
+
+    /** GT calls this when creating the dropped machine item. Missing keys restore the constructor defaults on place. */
+    @Override
+    public void setItemNBT(NBTTagCompound aNBT) {
+        super.setItemNBT(aNBT);
+        if (structureTier != DEFAULT_STRUCTURE_TIER) aNBT.setInteger(NBT_STRUCTURE_TIER, structureTier);
+        if (energyTier != DEFAULT_ENERGY_TIER) aNBT.setInteger(NBT_ENERGY_TIER, energyTier);
+        if (amperage != DEFAULT_AMPERAGE) aNBT.setInteger(NBT_AMPERAGE, amperage);
     }
 
     @Override

@@ -9,6 +9,7 @@ import cpw.mods.fml.common.registry.GameRegistry;
 import gregtech.api.GregTechAPI;
 import gregtech.api.enums.MetaTileEntityIDs;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
+import gregtech.api.util.GTModHandler;
 
 /**
  * 配方注册。
@@ -45,6 +46,12 @@ public final class RecipeLoader {
             new ItemStack(Blocks.lever),
             'H',
             lvEnergyHatch);
+
+        ItemStack cleanHatch = MachineLoader.VARIABLE_ENERGY_HATCH.getStackForm(1);
+        GTModHandler.addShapelessCraftingRecipe(
+            cleanHatch,
+            GTModHandler.RecipeBits.NOT_REMOVABLE,
+            new Object[] { cleanHatch.copy() });
     }
 
     private static ItemStack lvEnergyHatch() {
