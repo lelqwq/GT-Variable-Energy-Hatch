@@ -30,7 +30,7 @@
 | 电流档位 | {2, 4, 16, 64}，默认 2 | 对应覆盖层 2A/4A/16A/64A 与原版真实仓型 |
 | 默认值 | 结构 LV / 供电 LV / 2A | |
 | GUI | 右键打开；窗口 **176×211**；三项只读显示 + 左右箭头调节 | ModularUI 1.x，与 GT 自己的 hatch 同一套（非新增依赖）；高度由布局推出，见下方"GUI 为什么要加高" |
-| 存取 | 方块存档、掉落物 NBT 三键 + GT 原生描述包 | 拆除后保留非默认配置；单物品无序合成清空全部 NBT |
+| 存取 | 方块存档、掉落物 NBT 三键 + GT 原生描述包 | 拆除后保留非默认配置；单物品无序合成只清除这三个配置键 |
 | 依赖 | 仅 GT5U（编译期另需 AE2/ModularUI/ModularUI2/GTNHLib/StructureLib 可见性） | 无 Mixin、无 UniMixins |
 
 ### GUI 为什么要加高（176×166 → 176×211）
@@ -201,8 +201,8 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
 - [ ] 信息面板 / WAILA 的 tier 名本地化：现取 `GTValues.VOLTAGE_NAMES` 的英文长名
       （如 "Ultra Low Voltage"），中文客户端下这一项仍是英文，格式也与其它 GT 机器不一致。
       应改用 GT 的本地化 helper（`GTUtility.getColoredTierNameFromTier` / `GTValues.getLocalizedLongVoltageName`）。
-- [ ] tooltip 中文本地化：当前 `DESCRIPTION` 是构造期英文字面量（避免 lang 加载时机问题）；
-      若要中文，改为 lang key + 在 preInit 用 `GTLanguageManager.addStringLocalization` 注册，并验证 NEI 显示时机。
+- [x] 物品 tooltip 动态读取掉落物 NBT，显示三项实际配置；说明文字和配置标签通过 lang key 本地化。
+      GT 自动追加的固定默认「电压输入 / 容量」由客户端 tooltip 事件精确移除，避免与实际配置冲突。
 
 **实测清单（按顺序）**
 1. 单仓 + 供电等级 MV / 电流 2：与原版 MV 能源仓逐项比对（`maxEUInput`/`maxEUStore`/`maxAmperesIn`/预算）。
@@ -217,7 +217,8 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
    `MTEMultiBlockBase.java:589-593`）。
 7. 存档重启后三个值保持；客户端贴图/信息面板与所选值一致。
 8. 设置非默认参数后拆除并重新放置，三个值保持；默认参数的掉落物不带配置 NBT，可与新物品堆叠。
-9. 把带配置的仓单独放进任意合成格，输出物品清空全部 NBT，放置后恢复结构 LV / 供电 LV / 2A。
+9. 把带配置及覆盖板的仓单独放进任意合成格，输出只清除三个配置键，覆盖板等其它 NBT 保留；
+   放置后恢复结构 LV / 供电 LV / 2A。
 10. GTSWN 覆盖板贴在本仓上，配 V/A ≥ 预算 → 无线供电成立，网络按 (1+损耗) 扣账。
 11. GUI 布局：三组「标题 + 数字框」完整落在窗口上半部，**不压玩家背包**，背包 4 行全部可见可点
    （窗口 176×211，数值推导见第 2 节，仅经源码推算、未实机确认）。

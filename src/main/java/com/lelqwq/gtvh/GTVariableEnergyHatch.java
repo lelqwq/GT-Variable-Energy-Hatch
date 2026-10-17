@@ -1,8 +1,11 @@
 package com.lelqwq.gtvh;
 
+import net.minecraftforge.common.MinecraftForge;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.lelqwq.gtvh.client.VariableEnergyHatchTooltipHandler;
 import com.lelqwq.gtvh.loader.MachineLoader;
 import com.lelqwq.gtvh.loader.RecipeLoader;
 
@@ -38,6 +41,10 @@ public class GTVariableEnergyHatch {
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
+        if (event.getSide()
+            .isClient()) {
+            MinecraftForge.EVENT_BUS.register(new VariableEnergyHatchTooltipHandler());
+        }
         RecipeLoader.run();
     }
 }

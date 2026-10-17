@@ -14,3 +14,11 @@ gtvh.gui.power_tier.tooltip.warn=Explodes if the incoming cable voltage exceeds 
 gtvh.gui.amperage.tooltip=Amperage %s
 gtvh.gui.shift_hint.tier=Shift + click = change 4 tiers at once
 gtvh.gui.shift_hint.amperage=Shift + click = jump straight to 2A / 64A
+
+# Item tooltip
+gtvh.tooltip.configure=Right-click to configure.
+gtvh.tooltip.warning=WARNING: This hatch explodes if the incoming cable voltage exceeds the power tier.
+gtvh.tooltip.configuration=Current configuration
+gtvh.tooltip.structure_tier=Structure tier: %s
+gtvh.tooltip.power_tier=Power tier: %s (%s EU/t)
+gtvh.tooltip.amperage=Amperage: %s A

@@ -4,12 +4,12 @@ import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 
 import com.lelqwq.gtvh.GTVariableEnergyHatch;
+import com.lelqwq.gtvh.common.recipe.VariableEnergyHatchResetRecipe;
 
 import cpw.mods.fml.common.registry.GameRegistry;
 import gregtech.api.GregTechAPI;
 import gregtech.api.enums.MetaTileEntityIDs;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
-import gregtech.api.util.GTModHandler;
 
 /**
  * 配方注册。
@@ -48,10 +48,7 @@ public final class RecipeLoader {
             lvEnergyHatch);
 
         ItemStack cleanHatch = MachineLoader.VARIABLE_ENERGY_HATCH.getStackForm(1);
-        GTModHandler.addShapelessCraftingRecipe(
-            cleanHatch,
-            GTModHandler.RecipeBits.NOT_REMOVABLE,
-            new Object[] { cleanHatch.copy() });
+        GameRegistry.addRecipe(new VariableEnergyHatchResetRecipe(cleanHatch));
     }
 
     private static ItemStack lvEnergyHatch() {

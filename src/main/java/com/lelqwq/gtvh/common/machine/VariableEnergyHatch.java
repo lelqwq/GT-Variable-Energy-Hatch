@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
@@ -115,8 +116,7 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
     private static final int DEFAULT_ENERGY_TIER = 1;
     private static final int DEFAULT_AMPERAGE = 2;
 
-    private static final String[] DESCRIPTION = { "Right-click to configure.", "",
-        "WARNING: if the incoming cable voltage exceeds the power tier, this hatch explodes." };
+    private static final String[] DESCRIPTION = {};
 
     private int structureTier = DEFAULT_STRUCTURE_TIER; // LV
     private int energyTier = DEFAULT_ENERGY_TIER; // LV
@@ -133,6 +133,12 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
     @Override
     public MetaTileEntity newMetaEntity(IGregTechTileEntity aTileEntity) {
         return new VariableEnergyHatch(mName, mDescriptionArray, mTextures);
+    }
+
+    @Override
+    public String[] getDescription() {
+        return new String[] { StatCollector.translateToLocal("gtvh.tooltip.configure"),
+            StatCollector.translateToLocal("gtvh.tooltip.warning") };
     }
 
     // ------------------------------------------------------------------
@@ -231,6 +237,15 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
         if (amperage != DEFAULT_AMPERAGE) aNBT.setInteger(NBT_AMPERAGE, amperage);
     }
 
+    public static void clearItemConfiguration(ItemStack stack) {
+        if (stack == null || !stack.hasTagCompound()) return;
+        NBTTagCompound nbt = stack.getTagCompound();
+        nbt.removeTag(NBT_STRUCTURE_TIER);
+        nbt.removeTag(NBT_ENERGY_TIER);
+        nbt.removeTag(NBT_AMPERAGE);
+        if (nbt.hasNoTags()) stack.setTagCompound(null);
+    }
+
     @Override
     public void loadNBTData(NBTTagCompound aNBT) {
         super.loadNBTData(aNBT);
@@ -265,6 +280,30 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
     @Override
     public boolean isGivingInformation() {
         return true;
+    }
+
+    @Override
+    public void addAdditionalTooltipInformation(ItemStack stack, List<String> tooltip) {
+        int itemStructureTier = DEFAULT_STRUCTURE_TIER;
+        int itemEnergyTier = DEFAULT_ENERGY_TIER;
+        int itemAmperage = DEFAULT_AMPERAGE;
+        NBTTagCompound nbt = stack.getTagCompound();
+        if (nbt != null) {
+            if (nbt.hasKey(NBT_STRUCTURE_TIER)) itemStructureTier = clampTier(nbt.getInteger(NBT_STRUCTURE_TIER));
+            if (nbt.hasKey(NBT_ENERGY_TIER)) itemEnergyTier = clampTier(nbt.getInteger(NBT_ENERGY_TIER));
+            if (nbt.hasKey(NBT_AMPERAGE)) itemAmperage = snapAmperage(nbt.getInteger(NBT_AMPERAGE));
+        }
+        tooltip.add(EnumChatFormatting.GOLD + StatCollector.translateToLocal("gtvh.tooltip.configuration"));
+        tooltip.add(
+            EnumChatFormatting.GRAY + StatCollector
+                .translateToLocalFormatted("gtvh.tooltip.structure_tier", shortTierName(itemStructureTier)));
+        tooltip.add(
+            EnumChatFormatting.GRAY + StatCollector.translateToLocalFormatted(
+                "gtvh.tooltip.power_tier",
+                shortTierName(itemEnergyTier),
+                GTUtility.formatNumbers(GTValues.V[itemEnergyTier])));
+        tooltip.add(
+            EnumChatFormatting.GRAY + StatCollector.translateToLocalFormatted("gtvh.tooltip.amperage", itemAmperage));
     }
 
     @Override
