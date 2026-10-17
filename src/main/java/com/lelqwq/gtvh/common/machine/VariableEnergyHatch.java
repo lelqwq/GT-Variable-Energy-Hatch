@@ -11,6 +11,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
+import net.minecraftforge.common.util.ForgeDirection;
 
 import com.gtnewhorizons.modularui.api.math.Alignment;
 import com.gtnewhorizons.modularui.api.math.Color;
@@ -57,7 +58,7 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
     /** 电流可选档位（对应原版 2A/4A/16A/64A） */
     public static final int[] AMPERAGE_STEPS = { 2, 4, 16, 64 };
 
-    /** 构造期固定 tier：仅用于未接入多方块时的外壳贴图回退与物品图标 */
+    /** 构造期固定 tier：仅用于注册、物品图标，以及识别未接入多方块时的默认外壳 */
     private static final int BASE_TIER = 1;
 
     // ------------------------------------------------------------------
@@ -111,6 +112,9 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
     private static final String NBT_STRUCTURE_TIER = "structureTier";
     private static final String NBT_ENERGY_TIER = "energyTier";
     private static final String NBT_AMPERAGE = "amperage";
+
+    /** GT's inventory renderer only supplies item damage, so the item renderer passes NBT through this context. */
+    private static final ThreadLocal<ItemStack> RENDERED_ITEM = new ThreadLocal<>();
 
     private static final int DEFAULT_STRUCTURE_TIER = 1;
     private static final int DEFAULT_ENERGY_TIER = 1;
@@ -189,8 +193,21 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
     }
 
     // ------------------------------------------------------------------
-    // 贴图：外壳由 GT 在装机时改写成机器外壳；tier 可视线索在覆盖层
+    // 贴图：独立放置时外壳随供电等级变化；装入多方块后保留控制器指定的机器外壳
     // ------------------------------------------------------------------
+
+    @Override
+    public ITexture[] getTexture(IGregTechTileEntity base, ForgeDirection side, ForgeDirection facing, int colorIndex,
+        boolean active, boolean redstoneLevel) {
+        ITexture[] textures = super.getTexture(base, side, facing, colorIndex, active, redstoneLevel);
+        int casingColor = colorIndex + 1;
+        if (textures.length > 0 && casingColor >= 0
+            && casingColor < Textures.BlockIcons.MACHINE_CASINGS[BASE_TIER].length
+            && textures[0] == Textures.BlockIcons.MACHINE_CASINGS[BASE_TIER][casingColor]) {
+            textures[0] = Textures.BlockIcons.MACHINE_CASINGS[getTextureEnergyTier()][casingColor];
+        }
+        return textures;
+    }
 
     @Override
     public ITexture[] getTexturesActive(ITexture aBaseTexture) {
@@ -204,16 +221,32 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
 
     private ITexture getOverlay() {
         final ITexture[] overlay;
-        if (amperage > 16) {
+        int textureAmperage = getTextureAmperage();
+        if (textureAmperage > 16) {
             overlay = Textures.BlockIcons.OVERLAYS_ENERGY_IN_MULTI_64A;
-        } else if (amperage > 4) {
+        } else if (textureAmperage > 4) {
             overlay = Textures.BlockIcons.OVERLAYS_ENERGY_IN_MULTI_16A;
-        } else if (amperage > 2) {
+        } else if (textureAmperage > 2) {
             overlay = Textures.BlockIcons.OVERLAYS_ENERGY_IN_MULTI_4A;
         } else {
             overlay = Textures.BlockIcons.OVERLAYS_ENERGY_IN_MULTI_2A;
         }
-        return overlay[Math.min(energyTier + 1, overlay.length - 1)];
+        return overlay[Math.min(getTextureEnergyTier() + 1, overlay.length - 1)];
+    }
+
+    private int getTextureEnergyTier() {
+        ItemStack stack = RENDERED_ITEM.get();
+        if (stack == null) return energyTier;
+        NBTTagCompound nbt = stack.getTagCompound();
+        return nbt != null && nbt.hasKey(NBT_ENERGY_TIER) ? clampTier(nbt.getInteger(NBT_ENERGY_TIER))
+            : DEFAULT_ENERGY_TIER;
+    }
+
+    private int getTextureAmperage() {
+        ItemStack stack = RENDERED_ITEM.get();
+        if (stack == null) return amperage;
+        NBTTagCompound nbt = stack.getTagCompound();
+        return nbt != null && nbt.hasKey(NBT_AMPERAGE) ? snapAmperage(nbt.getInteger(NBT_AMPERAGE)) : DEFAULT_AMPERAGE;
     }
 
     // ------------------------------------------------------------------
@@ -244,6 +277,17 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
         nbt.removeTag(NBT_ENERGY_TIER);
         nbt.removeTag(NBT_AMPERAGE);
         if (nbt.hasNoTags()) stack.setTagCompound(null);
+    }
+
+    public static void renderItemWithConfiguration(ItemStack stack, Runnable render) {
+        ItemStack previous = RENDERED_ITEM.get();
+        RENDERED_ITEM.set(stack);
+        try {
+            render.run();
+        } finally {
+            if (previous == null) RENDERED_ITEM.remove();
+            else RENDERED_ITEM.set(previous);
+        }
     }
 
     @Override

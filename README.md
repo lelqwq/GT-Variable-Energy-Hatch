@@ -94,8 +94,8 @@
 
 ## 当前状态
 
-**编译通过**：`./gradlew build` 成功，产物 `build/libs/gtvariablehatch-1.0.1.jar`，
-jar 内 `Tags.VERSION` 与 `mcmod.info` 的版本均为 `1.0.1`（三处版本号已对齐）。
+**编译通过**：`./gradlew build` 成功，产物 `build/libs/gtvariablehatch-1.0.2.jar`，
+jar 内 `Tags.VERSION` 与 `mcmod.info` 的版本均为 `1.0.2`（三处版本号已对齐）。
 
 已写：构建脚本、主类、MTE 本体（三个可调项 + 全部覆写 + NBT/描述包 + 信息面板 + GUI）、注册、配方、中英 lang、mcmod.info。
 

@@ -74,6 +74,7 @@ GT 默认窗口是 176×166（`IMetaTileEntity.getGUIWidth/getGUIHeight` 的默�
 | `maxWorkingAmperesIn()` | `amperage` | 照抄 `MTEHatchEnergyMulti.java:133-136` |
 | `getInputTier()` | `energyTier` | `MTETieredMachineBlock.java:75-78` 默认返回 `mTier`；GT 的 `getInputVoltageTier()`、WAILA 的 energyTier 标签、`BaseMetaTileEntity.dischargeItem()` 都读它，不覆写则永远按 LV 上报 |
 | `getTierForStructure()` | `structureTier` | `MTEHatch.java:151-153` 默认返回 `mTier`；该 hook 的 javadoc 明说用于"结构检查用自定义 tier，`mTier` 保留作他用" |
+| `getTexture()` | 独立放置时将固定 LV 默认外壳替换为 `energyTier` 对应外壳；控制器通过 `updateTexture()` 指定的多方块外壳保持不变 | 避免供电等级变化时只有输入覆盖层变化，也避免破坏多方块机壳贴图 |
 | `getTexturesActive/Inactive()` | 按 `amperage` 选 `OVERLAYS_ENERGY_IN_MULTI_{2A,4A,16A,64A}`，索引 `energyTier + 1` | `MTEHatchEnergy.java:39-47` 硬编码 2A；选法照 `MTEHatchEnergyMulti.java:63-91` |
 
 **buffer 为什么必须含电流**：多方块每 tick 只调用一次 `drainEnergyInput`，而它取
@@ -192,8 +193,8 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
 
 **功能相关**
 - [x] 物品图标与 GT 创造栏条目：`BlockMachines.getSubBlocks`（`:671-677`）枚举全部非空 MTE，
-      物品会**自动**出现在 GT 主创造栏，无需显式注册；图标取原型实例（`mTier = BASE_TIER = 1`）的外壳，
-      即 LV 机壳。
+      物品会**自动**出现在 GT 主创造栏，无需显式注册；自定义物品渲染器从物品 NBT 读取供电等级和电流，
+      使背包、手持与掉落物的外壳和输入覆盖层对应实际配置。
 - [x] 电流档位改为真正的循环控件：已改成 `[−][只读显示][+]`，箭头沿 `AMPERAGE_STEPS` 走
       （2→4→16→64），Shift+点击直接到两端。顺带解掉了"数字框 + 吸附 + 滚轮步长对不齐"那一串问题：
       没有输入框就没有显示值与存储值不一致的可能，也没有滚轮。可继续考虑 `CycleButtonWidget`
