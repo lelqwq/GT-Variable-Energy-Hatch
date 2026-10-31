@@ -3,8 +3,8 @@
 	"modList": [{
 		"modid": "gtvariablehatch",
 		"name": "Variable Energy Hatch",
-		"description": "Adds a single multiblock energy hatch whose structure tier, power tier and amperage are switchable in its GUI. Pure GT5U addon: no mixins, no extra dependencies at runtime.",
-		"version": "1.0.2",
+		"description": "Adds a configurable multiblock energy hatch with MT-3662 compatibility.",
+		"version": "1.0.3",
 		"mcversion": "1.7.10",
 		"url": "",
 		"updateUrl": "",
@@ -13,8 +13,8 @@
 		"logoFile": "",
 		"screenshots": [],
 		"parent": "",
-		"requiredMods": ["gregtech"],
-		"dependencies": ["gregtech"],
+		"requiredMods": ["gregtech", "unimixins"],
+		"dependencies": ["gregtech", "unimixins"],
 		"dependants": [],
 		"useDependencyInformation": false
 	}]

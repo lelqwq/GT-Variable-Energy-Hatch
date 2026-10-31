@@ -25,7 +25,7 @@ import cpw.mods.fml.common.event.FMLPreInitializationEvent;
     name = "Variable Energy Hatch",
     acceptedMinecraftVersions = "[1.7.10]",
     // required-after:gregtech 是硬要求：MTE 必须构造在 GT preload 已开始、postload 尚未开始的窗口内
-    dependencies = "required-after:gregtech;")
+    dependencies = "required-after:gregtech;required-after:unimixins;")
 public class GTVariableEnergyHatch {
 
     public static final String MODID = "gtvariablehatch";

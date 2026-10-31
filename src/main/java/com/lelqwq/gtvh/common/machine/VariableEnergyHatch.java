@@ -47,7 +47,7 @@ import gregtech.api.util.GTUtility;
  * 扳手等级也无实际影响，故不覆写。</li>
  * </ul>
  * 已知限制：多方块只有一个能源仓且无 exotic 仓时，GT 的 {@code setProcessingLogicPower}
- * 会把可用电流硬写成 1A（{@code useSingleAmp}），此时本仓的电流档位不参与功率预算。
+ * 会把可用电流硬写成 1A（{@code useSingleAmp}）；MT-3662 的兼容补丁对此作了例外处理。
  */
 public class VariableEnergyHatch extends MTEHatchEnergy {
 

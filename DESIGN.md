@@ -1,5 +1,7 @@
 # DESIGN — 可变能源仓
 
+> 更新：MT-3662 兼容补丁使用 UniMixins，按可变仓的实时供电等级计算电压，并允许单个可变仓的电流档位参与预算。下文原始设计和通用单仓限制应以此例外为准。
+
 本文记录**为什么这么做**与**依据在哪**（GT5U 均指 `GT5-Unofficial 5.09.51.476`，行号对应该版本源码）。
 使用说明与构建方式见 [`README.md`](README.md)。
 
@@ -31,7 +33,7 @@
 | 默认值 | 结构 LV / 供电 LV / 2A | |
 | GUI | 右键打开；窗口 **176×211**；三项只读显示 + 左右箭头调节 | ModularUI 1.x，与 GT 自己的 hatch 同一套（非新增依赖）；高度由布局推出，见下方"GUI 为什么要加高" |
 | 存取 | 方块存档、掉落物 NBT 三键 + GT 原生描述包 | 拆除后保留非默认配置；单物品无序合成只清除这三个配置键 |
-| 依赖 | 仅 GT5U（编译期另需 AE2/ModularUI/ModularUI2/GTNHLib/StructureLib 可见性） | 无 Mixin、无 UniMixins |
+| 依赖 | GT5U、UniMixins（编译期另需 AE2/ModularUI/ModularUI2/GTNHLib/StructureLib 可见性） | MT-3662 兼容补丁使用 Mixin |
 
 ### GUI 为什么要加高（176×166 → 176×211）
 
@@ -160,7 +162,7 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
 
 ## 6. 刻意不做
 
-- 不做 Mixin（因此不需要 UniMixins）；不改 `mTier`；不做动力仓/输出侧；不做仓自取电（保持"纯 GT 扩展"）；
+- 不改 `mTier`；不做动力仓/输出侧；不做仓自取电；MT-3662 通过 Mixin 兼容；
   单方块机器的超频不受本模组影响。
 
 ## 7. 待办与未验证项
