@@ -1,5 +1,6 @@
 package com.lelqwq.gtvh.common.machine;
 
+import static com.gtnewhorizon.gtnhlib.util.numberformatting.NumberFormatUtil.formatNumber;
 import static gregtech.api.metatileentity.BaseTileEntity.TOOLTIP_DELAY;
 
 import java.util.Arrays;
@@ -27,12 +28,12 @@ import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.metatileentity.implementations.MTEHatchEnergy;
-import gregtech.api.util.GTUtility;
+import io.netty.buffer.ByteBuf;
 
 /**
  * 可变能源仓 —— 结构 tier / 电气 tier / 电流三项均可在 GUI 中切换的能源仓。
  * <p>
- * 设计要点（与 GT5U 5.09.51.476 对齐，行号见 DESIGN.md）：
+ * 设计要点（与 GT5U 5.09.54.265 对齐）：
  * <ul>
  * <li>只有一个类，恒为 {@link MTEHatchEnergy} 的子类，因此永远进入多方块的 {@code mEnergyHatches}
  * （结构元素按 {@code instanceof MTEHatchEnergy} 匹配），不会被归入 exotic 列表；</li>
@@ -299,22 +300,21 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
         if (aNBT.hasKey(NBT_AMPERAGE)) amperage = snapAmperage(aNBT.getInteger(NBT_AMPERAGE));
     }
 
-    /** 服务端 → 客户端：走 GT 原生描述包，不需要自定义网络包 */
+    /** 服务端 → 客户端：跟随 GT 的方块同步流。 */
     @Override
-    public NBTTagCompound getDescriptionData() {
-        NBTTagCompound data = super.getDescriptionData();
-        data.setInteger(NBT_STRUCTURE_TIER, structureTier);
-        data.setInteger(NBT_ENERGY_TIER, energyTier);
-        data.setInteger(NBT_AMPERAGE, amperage);
-        return data;
+    public void writeToStream(ByteBuf buffer) {
+        super.writeToStream(buffer);
+        buffer.writeInt(structureTier);
+        buffer.writeInt(energyTier);
+        buffer.writeInt(amperage);
     }
 
     @Override
-    public void onDescriptionPacket(NBTTagCompound data) {
-        super.onDescriptionPacket(data);
-        if (data.hasKey(NBT_STRUCTURE_TIER)) structureTier = clampTier(data.getInteger(NBT_STRUCTURE_TIER));
-        if (data.hasKey(NBT_ENERGY_TIER)) energyTier = clampTier(data.getInteger(NBT_ENERGY_TIER));
-        if (data.hasKey(NBT_AMPERAGE)) amperage = snapAmperage(data.getInteger(NBT_AMPERAGE));
+    public void readFromStream(ByteBuf buffer) {
+        super.readFromStream(buffer);
+        structureTier = clampTier(buffer.readInt());
+        energyTier = clampTier(buffer.readInt());
+        amperage = snapAmperage(buffer.readInt());
     }
 
     // ------------------------------------------------------------------
@@ -345,7 +345,7 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
             EnumChatFormatting.GRAY + StatCollector.translateToLocalFormatted(
                 "gtvh.tooltip.power_tier",
                 shortTierName(itemEnergyTier),
-                GTUtility.formatNumbers(GTValues.V[itemEnergyTier])));
+                formatNumber(GTValues.V[itemEnergyTier])));
         tooltip.add(
             EnumChatFormatting.GRAY + StatCollector.translateToLocalFormatted("gtvh.tooltip.amperage", itemAmperage));
     }
@@ -357,16 +357,16 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
                 + tierName(energyTier)
                 + EnumChatFormatting.RESET
                 + " ("
-                + GTUtility.formatNumbers(GTValues.V[energyTier])
+                + formatNumber(GTValues.V[energyTier])
                 + " EU/t)",
             "Amperage: " + EnumChatFormatting.YELLOW
                 + amperage
                 + " A"
                 + EnumChatFormatting.RESET
                 + " (budget "
-                + GTUtility.formatNumbers(GTValues.V[energyTier] * amperage)
+                + formatNumber(GTValues.V[energyTier] * amperage)
                 + " EU/t)",
-            "Buffer: " + GTUtility.formatNumbers(maxEUStore()) + " EU" };
+            "Buffer: " + formatNumber(maxEUStore()) + " EU" };
     }
 
     // ------------------------------------------------------------------
@@ -455,8 +455,8 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
      * 只读数值框：GT 文本框底图 + 居中白字。与原来的 {@code NumericWidget} 外观一致，但不可输入。
      * <p>
      * 用 {@link TextWidget#setStringSupplier} 而不是 DynamicTextWidget：前者只在客户端求值
-     * （MUI 的 javadoc 明说 supplier 只在客户端调用），值本身由 GT 原生描述包同步到客户端
-     * （见 {@code getDescriptionData}/{@code onDescriptionPacket}），所以改档后客户端立刻能显示，
+     * （MUI 的 javadoc 明说 supplier 只在客户端调用），值本身由 GT 原生同步流发送到客户端
+     * （见 {@code writeToStream}/{@code readFromStream}），所以改档后客户端能显示，
      * 不需要额外的网络包，也不受滚轮影响。
      */
     private static TextWidget valueBox(Supplier<String> display, Supplier<List<String>> tooltip, int x, int y) {
@@ -529,7 +529,7 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
         return Arrays.asList(
             StatCollector.translateToLocalFormatted(
                 "gtvh.gui.power_tier.tooltip",
-                shortTierName(energyTier) + " · " + GTUtility.formatNumbers(GTValues.V[energyTier]) + " EU/t"),
+                shortTierName(energyTier) + " · " + formatNumber(GTValues.V[energyTier]) + " EU/t"),
             StatCollector.translateToLocal("gtvh.gui.power_tier.tooltip.warn"),
             StatCollector.translateToLocal("gtvh.gui.shift_hint.tier"));
     }
@@ -593,7 +593,7 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
         return best;
     }
 
-    /** 电流吸附到最近的合法档位（取值域始终是 AMPERAGE_STEPS，NBT 读档与描述包也走这里） */
+    /** 电流吸附到最近的合法档位（NBT 读档与同步流也走这里） */
     private static int snapAmperage(int value) {
         return AMPERAGE_STEPS[amperageIndex(value)];
     }

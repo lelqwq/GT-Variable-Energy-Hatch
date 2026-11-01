@@ -1,6 +1,6 @@
 # Variable Energy Hatch（可变能源仓）
 
-一个 GTNH 2.8.4 / GT5U 5.09.51 的小型 addon：**一个方块顶掉能源仓的 tier 选择题**。
+一个 GTNH 2.9.0 / GT5U 5.09.54.265 的小型 addon：**一个方块顶掉能源仓的 tier 选择题**。GTNH 2.8.4 请使用 1.0.3。
 
 多方块只装一个能源仓、又想跑更高等级的配方时，原版的办法是拆机器换更高级的仓、或者堆更多仓。
 本模组把这件事收进一个方块：结构等级、供电等级、电流三项都在它自己的 GUI 里切。
@@ -87,23 +87,21 @@
 ## 构建
 
 - **必须 Java 25**（`.java-version`）。
-- 编译目标 `GT5U 5.09.51.476`（= GTNH 2.8.4，实机 .482）。
+- 编译目标 `GT5U 5.09.54.265`（GTNH 2.9.0）。
 - `./gradlew build`，产物 `build/libs/gtvariablehatch-<版本>.jar`（只发主 jar，不带 `-dev`/`-sources`）。
 - **改版本时三处同改**：`gradle.properties` 的 `RELEASE_VERSION`、`src/main/resources/mcmod.info` 的 `version`、
   `@Mod` 注解（`Tags` 自动）。GTNH 模板**不替换** mcmod.info，游戏 Mods 界面显示的就是它，改完必须重编。
 
 ## 当前状态
 
-**构建产物**：`build/libs/gtvariablehatch-1.0.3.jar`，
-`Tags.VERSION` 与 `mcmod.info` 的版本均为 `1.0.3`。
+**构建产物**：`build/libs/gtvariablehatch-1.0.4.jar`，
+`Tags.VERSION` 与 `mcmod.info` 的版本均为 `1.0.4`。
 
-已写：构建脚本、主类、MTE 本体（三个可调项 + 全部覆写 + NBT/描述包 + 信息面板 + GUI）、注册、配方、中英 lang、mcmod.info。
+已写：构建脚本、主类、MTE 本体（三个可调项 + 全部覆写 + NBT/同步流 + 信息面板 + GUI）、注册、配方、中英 lang、mcmod.info。
 
-**尚未验证**（`DESIGN.md` 第 7 节有完整清单）：其余游戏内实际行为、runClient 开发环境。
+**尚未验证**：2.9.0 游戏内启动、同步与机器运行行为。
 
-其中四条已从 GT5U 源码确认、可移出待验证清单（见 `DESIGN.md` 第 7 节）：物品与创造栏条目、
-改档后的客户端同步与落盘、控件显示值恒等于仓存储值（数值框已改为只读）、GUI 布局不再压背包。
-另：信息面板里的 tier 名仍是 `GTValues.VOLTAGE_NAMES` 的英文长名（如 "Ultra Low Voltage"），
+信息面板里的 tier 名仍是 `GTValues.VOLTAGE_NAMES` 的英文长名（如 "Ultra Low Voltage"），
 中文客户端下这一项不本地化。
 
 ## 目录

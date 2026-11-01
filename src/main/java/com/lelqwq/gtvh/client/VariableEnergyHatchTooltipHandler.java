@@ -1,5 +1,7 @@
 package com.lelqwq.gtvh.client;
 
+import static com.gtnewhorizon.gtnhlib.util.numberformatting.NumberFormatUtil.formatNumber;
+
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.event.entity.player.ItemTooltipEvent;
 
@@ -22,11 +24,9 @@ public final class VariableEnergyHatchTooltipHandler {
         event.toolTip.remove(
             StatCollector.translateToLocalFormatted(
                 "gt.tileentity.eup_in",
-                GTUtility.formatNumbers(inputVoltage),
+                formatNumber(inputVoltage),
                 GTUtility.getColoredTierNameFromTier(GTUtility.getTier(inputVoltage))));
         event.toolTip.remove(
-            StatCollector.translateToLocalFormatted(
-                "gt.tileentity.eup_store",
-                GTUtility.formatNumbers(template.getEUCapacity())));
+            StatCollector.translateToLocalFormatted("gt.tileentity.eup_store", formatNumber(template.getEUCapacity())));
     }
 }

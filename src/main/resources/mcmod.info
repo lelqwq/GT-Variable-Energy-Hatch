@@ -4,7 +4,7 @@
 		"modid": "gtvariablehatch",
 		"name": "Variable Energy Hatch",
 		"description": "Adds a configurable multiblock energy hatch with MT-3662 compatibility.",
-		"version": "1.0.3",
+		"version": "1.0.4",
 		"mcversion": "1.7.10",
 		"url": "",
 		"updateUrl": "",
