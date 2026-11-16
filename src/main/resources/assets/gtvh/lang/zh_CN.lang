@@ -1,13 +1,17 @@
 gt.blockmachines.variable_energy_hatch.name=可变能源仓
+gt.blockmachines.variable_dynamo_hatch.name=可变动力仓
 
 gtvh.gui.structure_tier=结构等级
 gtvh.gui.power_tier=供电等级
+gtvh.gui.output_tier=输出等级
 gtvh.gui.amperage=电流
 
 # 鼠标悬停提示（%s 由代码填入档位/电压/电流）
 gtvh.gui.structure_tier.tooltip=结构等级 %s
 gtvh.gui.power_tier.tooltip=供电等级 %s
 gtvh.gui.power_tier.tooltip.warn=进线电压高于它会爆炸
+gtvh.gui.output_tier.tooltip=输出等级 %s
+gtvh.gui.output_tier.tooltip.warn=降低输出容量前请先停机
 gtvh.gui.amperage.tooltip=电流 %s
 gtvh.gui.shift_hint.tier=Shift + 点击箭头 = 一次调 4 级
 gtvh.gui.shift_hint.amperage=Shift + 点击箭头 = 直接切到 2A / 64A
@@ -15,7 +19,11 @@ gtvh.gui.shift_hint.amperage=Shift + 点击箭头 = 直接切到 2A / 64A
 # 物品提示
 gtvh.tooltip.configure=右键打开配置界面。
 gtvh.tooltip.warning=警告：输入线缆电压超过供电等级时，能源仓会爆炸。
+gtvh.tooltip.output_warning=请先停机再降低输出电压或电流。动力仓容量不足时，多方块可能爆炸。
 gtvh.tooltip.configuration=当前配置
 gtvh.tooltip.structure_tier=结构等级：%s
 gtvh.tooltip.power_tier=供电等级：%s（%s EU/t）
+gtvh.tooltip.output_tier=输出等级：%s（每安 %s EU/t）
 gtvh.tooltip.amperage=电流：%s A
+gtvh.info.throughput=标称功率：%s EU/t
+gtvh.info.buffer=储能容量：%s EU

@@ -1,6 +1,7 @@
 package com.lelqwq.gtvh.loader;
 
 import com.lelqwq.gtvh.common.api.enums.MetaTileEntityID;
+import com.lelqwq.gtvh.common.machine.VariableDynamoHatch;
 import com.lelqwq.gtvh.common.machine.VariableEnergyHatch;
 
 /**
@@ -15,6 +16,7 @@ public final class MachineLoader {
 
     /** 可变能源仓单例（注册后由 GT 的 ItemMachines 以 damage = MTE ID 提供物品形态） */
     public static VariableEnergyHatch VARIABLE_ENERGY_HATCH;
+    public static VariableDynamoHatch VARIABLE_DYNAMO_HATCH;
 
     private MachineLoader() {}
 
@@ -23,5 +25,9 @@ public final class MachineLoader {
             MetaTileEntityID.VARIABLE_ENERGY_HATCH.ID,
             "Variable Energy Hatch",
             "Variable Energy Hatch");
+        VARIABLE_DYNAMO_HATCH = new VariableDynamoHatch(
+            MetaTileEntityID.VARIABLE_DYNAMO_HATCH.ID,
+            "Variable Dynamo Hatch",
+            "Variable Dynamo Hatch");
     }
 }

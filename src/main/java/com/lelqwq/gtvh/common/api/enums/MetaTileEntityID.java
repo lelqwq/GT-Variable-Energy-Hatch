@@ -16,6 +16,7 @@ public enum MetaTileEntityID {
 
     /** 可变能源仓 */
     VARIABLE_ENERGY_HATCH(0),
+    VARIABLE_DYNAMO_HATCH(1),
 
     ;
 

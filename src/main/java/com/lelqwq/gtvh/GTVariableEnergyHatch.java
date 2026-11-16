@@ -5,8 +5,8 @@ import net.minecraftforge.common.MinecraftForge;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.lelqwq.gtvh.client.VariableEnergyHatchItemRenderer;
-import com.lelqwq.gtvh.client.VariableEnergyHatchTooltipHandler;
+import com.lelqwq.gtvh.client.VariableHatchItemRenderer;
+import com.lelqwq.gtvh.client.VariableHatchTooltipHandler;
 import com.lelqwq.gtvh.loader.MachineLoader;
 import com.lelqwq.gtvh.loader.RecipeLoader;
 
@@ -44,8 +44,8 @@ public class GTVariableEnergyHatch {
     public void init(FMLInitializationEvent event) {
         if (event.getSide()
             .isClient()) {
-            MinecraftForge.EVENT_BUS.register(new VariableEnergyHatchTooltipHandler());
-            VariableEnergyHatchItemRenderer.register();
+            MinecraftForge.EVENT_BUS.register(new VariableHatchTooltipHandler());
+            VariableHatchItemRenderer.register();
         }
         RecipeLoader.run();
     }

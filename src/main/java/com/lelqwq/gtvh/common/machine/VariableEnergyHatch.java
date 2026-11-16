@@ -1,142 +1,39 @@
 package com.lelqwq.gtvh.common.machine;
 
-import static com.gtnewhorizon.gtnhlib.util.numberformatting.NumberFormatUtil.formatNumber;
-import static gregtech.api.metatileentity.BaseTileEntity.TOOLTIP_DELAY;
-
-import java.util.Arrays;
 import java.util.List;
-import java.util.function.Supplier;
 
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.util.ForgeDirection;
 
-import com.gtnewhorizons.modularui.api.math.Alignment;
-import com.gtnewhorizons.modularui.api.math.Color;
 import com.gtnewhorizons.modularui.api.screen.ModularWindow;
 import com.gtnewhorizons.modularui.api.screen.UIBuildContext;
-import com.gtnewhorizons.modularui.common.widget.ButtonWidget;
-import com.gtnewhorizons.modularui.common.widget.TextWidget;
 
-import gregtech.api.enums.GTValues;
-import gregtech.api.enums.Textures;
 import gregtech.api.gui.modularui.GTUITextures;
+import gregtech.api.interfaces.IHideTooltipEnergyInfo;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.metatileentity.implementations.MTEHatchEnergy;
 import io.netty.buffer.ByteBuf;
 
-/**
- * 可变能源仓 —— 结构 tier / 电气 tier / 电流三项均可在 GUI 中切换的能源仓。
- * <p>
- * 设计要点（与 GT5U 5.09.54.265 对齐）：
- * <ul>
- * <li>只有一个类，恒为 {@link MTEHatchEnergy} 的子类，因此永远进入多方块的 {@code mEnergyHatches}
- * （结构元素按 {@code instanceof MTEHatchEnergy} 匹配），不会被归入 exotic 列表；</li>
- * <li>结构 tier 与电气 tier 解耦：{@code getTierForStructure()} 返回结构 tier，
- * 而 {@code maxEUInput()} 等返回电气 tier 派生的数值；</li>
- * <li>数值公式照抄 {@code MTEHatchEnergyMulti}（含 buffer 随电流放大，否则多仓场景下
- * 每 tick 抽取会被 buffer 卡住）；</li>
- * <li>{@code mTier} 在 GT5U 是 final 字段，故不反射改写（原版唯一先例 {@code TTUtility.setTier}
- * 自己也挂着"为什么要反射改 final 字段"的 TODO），改为覆写影响行为的读者：{@code maxEUInput()}
- * （全部电气数值由它派生）、{@code getTierForStructure()}、{@code getInputTier()}。
- * {@code getOutputTier()} 与 {@code getTileEntityBaseType()} 仍读到 mTier，但本仓没有输出侧、
- * 扳手等级也无实际影响，故不覆写。</li>
- * </ul>
- * 已知限制：多方块只有一个能源仓且无 exotic 仓时，GT 的 {@code setProcessingLogicPower}
- * 会把可用电流硬写成 1A（{@code useSingleAmp}）；MT-3662 的兼容补丁对此作了例外处理。
- */
-public class VariableEnergyHatch extends MTEHatchEnergy {
+/** A regular energy hatch with independently configurable structure and electrical tiers. */
+public class VariableEnergyHatch extends MTEHatchEnergy implements IHideTooltipEnergyInfo {
 
-    /** 结构 tier / 电气 tier 的可选范围：0=ULV .. 13=UXV（与原版能源仓注册范围一致） */
-    public static final int MIN_TIER = 0;
-    public static final int MAX_TIER = 13;
+    private final VariableHatchSettings settings = new VariableHatchSettings();
 
-    /** 电流可选档位（对应原版 2A/4A/16A/64A） */
-    public static final int[] AMPERAGE_STEPS = { 2, 4, 16, 64 };
-
-    /** 构造期固定 tier：仅用于注册、物品图标，以及识别未接入多方块时的默认外壳 */
-    private static final int BASE_TIER = 1;
-
-    // ------------------------------------------------------------------
-    // GUI 布局
-    //
-    // 每组控件两行：标题在上，下面一行是 [−][只读数值框][+]。三组竖排，GT 再把玩家背包贴在
-    // 窗口底部。窗口高度由"内容区 + 背包区"反推得出，而不是反过来把控件塞进固定高度里 ——
-    // 之前用 getGUIHeight()/5 - 7 起头、每组 +44 的固定偏移，在 176×166 的默认窗口里让后两组
-    // 控件正好压在背包格子上（背包从 y=83 起画）。
-    // ------------------------------------------------------------------
-
-    /** 只读数值框：宽度与标题同宽，两者同轴 */
-    private static final int VALUE_WIDTH = 70;
-    private static final int VALUE_HEIGHT = 18;
-    /** 两侧箭头按钮：用 GT 标准的 18×18 按钮底图 + 大号 −/+ 覆盖层 */
-    private static final int BUTTON_SIZE = 18;
-    private static final int BUTTON_GAP = 2;
-    /** 整行宽度 = 左箭头 + 数值框 + 右箭头。整行水平居中后数值框恰好也居中，标题因此与框同轴 */
-    private static final int ROW_WIDTH = BUTTON_SIZE * 2 + BUTTON_GAP * 2 + VALUE_WIDTH;
-
-    /** 结构/供电等级用：Shift + 点击箭头一次调几级 */
-    private static final int TIER_SHIFT_STEP = 4;
-
-    private static final int LABEL_HEIGHT = 14;
-    /** 标题到控件行之间、以及相邻两组之间的间距 */
-    private static final int LABEL_GAP = 2;
-    private static final int ROW_SPACING = 6;
-    /** 内容区上边距（窗口边框内）与最后一行控件到背包之间的留白 */
-    private static final int CONTENT_TOP = 8;
-    private static final int CONTENT_BOTTOM_GAP = 6;
-
-    /** 控件组数：必须与 addUIWidgets 里的 addSettingRow 调用次数一致（高度按它算） */
-    private static final int CONTROL_ROWS = 3;
-    /** 一组「标题 + 控件行」占的高度 */
-    private static final int ROW_BLOCK_HEIGHT = LABEL_HEIGHT + LABEL_GAP + VALUE_HEIGHT;
-    /** 内容区底边 = 最后一行控件底边 + 留白 */
-    private static final int CONTENT_BOTTOM = CONTENT_TOP + CONTROL_ROWS * ROW_BLOCK_HEIGHT
-        + (CONTROL_ROWS - 1) * ROW_SPACING
-        + CONTENT_BOTTOM_GAP;
-
-    /**
-     * 窗口底部必须留给玩家背包的高度：GT 默认的 {@code bindPlayerInventory} 把背包钉在窗口底部，
-     * 其顶边 = GUI 高度 - 边距(7) - 4 行格子(3×18 + 4 + 18 = 76)，即 83
-     * （{@code BaseTileEntity.java:652-654} → {@code ModularWindow.Builder.bindPlayerInventory}
-     * → {@code size.height - marginBottom - 76}）。GUI 高度装不下内容区 + 这 83px 就会压背包。
-     */
-    private static final int PLAYER_INVENTORY_RESERVED = 76 + 7;
-
-    private static final int GUI_HEIGHT = CONTENT_BOTTOM + PLAYER_INVENTORY_RESERVED;
-
-    private static final String NBT_STRUCTURE_TIER = "structureTier";
-    private static final String NBT_ENERGY_TIER = "energyTier";
-    private static final String NBT_AMPERAGE = "amperage";
-
-    /** GT's inventory renderer only supplies item damage, so the item renderer passes NBT through this context. */
-    private static final ThreadLocal<ItemStack> RENDERED_ITEM = new ThreadLocal<>();
-
-    private static final int DEFAULT_STRUCTURE_TIER = 1;
-    private static final int DEFAULT_ENERGY_TIER = 1;
-    private static final int DEFAULT_AMPERAGE = 2;
-
-    private static final String[] DESCRIPTION = {};
-
-    private int structureTier = DEFAULT_STRUCTURE_TIER; // LV
-    private int energyTier = DEFAULT_ENERGY_TIER; // LV
-    private int amperage = DEFAULT_AMPERAGE;
-
-    public VariableEnergyHatch(int aID, String aName, String aNameRegional) {
-        super(aID, aName, aNameRegional, BASE_TIER, 0, DESCRIPTION);
+    public VariableEnergyHatch(int id, String name, String regionalName) {
+        super(id, name, regionalName, VariableHatchSettings.BASE_TIER, 0, new String[0]);
     }
 
-    public VariableEnergyHatch(String aName, String[] aDescription, ITexture[][][] aTextures) {
-        super(aName, BASE_TIER, aDescription, aTextures);
+    private VariableEnergyHatch(String name, String[] description, ITexture[][][] textures) {
+        super(name, VariableHatchSettings.BASE_TIER, description, textures);
     }
 
     @Override
-    public MetaTileEntity newMetaEntity(IGregTechTileEntity aTileEntity) {
+    public MetaTileEntity newMetaEntity(IGregTechTileEntity tile) {
         return new VariableEnergyHatch(mName, mDescriptionArray, mTextures);
     }
 
@@ -146,180 +43,83 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
             StatCollector.translateToLocal("gtvh.tooltip.warning") };
     }
 
-    // ------------------------------------------------------------------
-    // 电气侧：全部由 energyTier / amperage 派生
-    // ------------------------------------------------------------------
+    @Override
+    public byte getTierForStructure() {
+        return settings.structureTier();
+    }
+
+    @Override
+    public long getInputTier() {
+        return settings.powerTier();
+    }
 
     @Override
     public long maxEUInput() {
-        return GTValues.V[energyTier];
+        return settings.voltage();
     }
 
-    /** 照抄 MTEHatchEnergyMulti：buffer 必须随电流放大，否则每 tick 抽取上限 = buffer */
     @Override
     public long maxEUStore() {
-        return 512L + GTValues.V[energyTier] * 4L * amperage;
+        return settings.capacity();
     }
 
-    /** 照抄 MTEHatchEnergyMulti：A + A/4（留损耗余量） */
     @Override
     public long maxAmperesIn() {
-        return amperage + (amperage >> 2);
+        int amps = settings.amperage();
+        return amps + (amps >> 2);
     }
 
     @Override
     public long maxWorkingAmperesIn() {
-        return amperage;
+        return settings.amperage();
     }
-
-    /**
-     * 覆写 {@code MTETieredMachineBlock} 对 mTier 的直读。GT 的
-     * {@code MTEMultiBlockBase.getInputVoltageTier()}、WAILA 的 energyTier 标签，以及
-     * {@code BaseMetaTileEntity.dischargeItem()} 都走这里；不覆写则不论选了什么供电等级，
-     * 上报出去的机器 tier 永远是 BASE_TIER(LV)，与实际电压自相矛盾。
-     * 语义与 {@code MetaTileEntity.getInputTier()}（由上报电压反推）一致。
-     */
-    @Override
-    public long getInputTier() {
-        return energyTier;
-    }
-
-    // ------------------------------------------------------------------
-    // 结构侧
-    // ------------------------------------------------------------------
-
-    @Override
-    public byte getTierForStructure() {
-        return (byte) structureTier;
-    }
-
-    // ------------------------------------------------------------------
-    // 贴图：独立放置时外壳随供电等级变化；装入多方块后保留控制器指定的机器外壳
-    // ------------------------------------------------------------------
 
     @Override
     public ITexture[] getTexture(IGregTechTileEntity base, ForgeDirection side, ForgeDirection facing, int colorIndex,
         boolean active, boolean redstoneLevel) {
-        ITexture[] textures = super.getTexture(base, side, facing, colorIndex, active, redstoneLevel);
-        int casingColor = colorIndex + 1;
-        if (textures.length > 0 && casingColor >= 0
-            && casingColor < Textures.BlockIcons.MACHINE_CASINGS[BASE_TIER].length
-            && textures[0] == Textures.BlockIcons.MACHINE_CASINGS[BASE_TIER][casingColor]) {
-            textures[0] = Textures.BlockIcons.MACHINE_CASINGS[getTextureEnergyTier()][casingColor];
-        }
-        return textures;
+        return settings
+            .replaceDefaultCasing(super.getTexture(base, side, facing, colorIndex, active, redstoneLevel), colorIndex);
     }
 
     @Override
-    public ITexture[] getTexturesActive(ITexture aBaseTexture) {
-        return new ITexture[] { aBaseTexture, getOverlay() };
+    public ITexture[] getTexturesActive(ITexture baseTexture) {
+        return getTexturesInactive(baseTexture);
     }
 
     @Override
-    public ITexture[] getTexturesInactive(ITexture aBaseTexture) {
-        return new ITexture[] { aBaseTexture, getOverlay() };
-    }
-
-    private ITexture getOverlay() {
-        final ITexture[] overlay;
-        int textureAmperage = getTextureAmperage();
-        if (textureAmperage > 16) {
-            overlay = Textures.BlockIcons.OVERLAYS_ENERGY_IN_MULTI_64A;
-        } else if (textureAmperage > 4) {
-            overlay = Textures.BlockIcons.OVERLAYS_ENERGY_IN_MULTI_16A;
-        } else if (textureAmperage > 2) {
-            overlay = Textures.BlockIcons.OVERLAYS_ENERGY_IN_MULTI_4A;
-        } else {
-            overlay = Textures.BlockIcons.OVERLAYS_ENERGY_IN_MULTI_2A;
-        }
-        return overlay[Math.min(getTextureEnergyTier() + 1, overlay.length - 1)];
-    }
-
-    private int getTextureEnergyTier() {
-        ItemStack stack = RENDERED_ITEM.get();
-        if (stack == null) return energyTier;
-        NBTTagCompound nbt = stack.getTagCompound();
-        return nbt != null && nbt.hasKey(NBT_ENERGY_TIER) ? clampTier(nbt.getInteger(NBT_ENERGY_TIER))
-            : DEFAULT_ENERGY_TIER;
-    }
-
-    private int getTextureAmperage() {
-        ItemStack stack = RENDERED_ITEM.get();
-        if (stack == null) return amperage;
-        NBTTagCompound nbt = stack.getTagCompound();
-        return nbt != null && nbt.hasKey(NBT_AMPERAGE) ? snapAmperage(nbt.getInteger(NBT_AMPERAGE)) : DEFAULT_AMPERAGE;
-    }
-
-    // ------------------------------------------------------------------
-    // 存取与同步
-    // ------------------------------------------------------------------
-
-    @Override
-    public void saveNBTData(NBTTagCompound aNBT) {
-        super.saveNBTData(aNBT);
-        aNBT.setInteger(NBT_STRUCTURE_TIER, structureTier);
-        aNBT.setInteger(NBT_ENERGY_TIER, energyTier);
-        aNBT.setInteger(NBT_AMPERAGE, amperage);
-    }
-
-    /** GT calls this when creating the dropped machine item. Missing keys restore the constructor defaults on place. */
-    @Override
-    public void setItemNBT(NBTTagCompound aNBT) {
-        super.setItemNBT(aNBT);
-        if (structureTier != DEFAULT_STRUCTURE_TIER) aNBT.setInteger(NBT_STRUCTURE_TIER, structureTier);
-        if (energyTier != DEFAULT_ENERGY_TIER) aNBT.setInteger(NBT_ENERGY_TIER, energyTier);
-        if (amperage != DEFAULT_AMPERAGE) aNBT.setInteger(NBT_AMPERAGE, amperage);
-    }
-
-    public static void clearItemConfiguration(ItemStack stack) {
-        if (stack == null || !stack.hasTagCompound()) return;
-        NBTTagCompound nbt = stack.getTagCompound();
-        nbt.removeTag(NBT_STRUCTURE_TIER);
-        nbt.removeTag(NBT_ENERGY_TIER);
-        nbt.removeTag(NBT_AMPERAGE);
-        if (nbt.hasNoTags()) stack.setTagCompound(null);
-    }
-
-    public static void renderItemWithConfiguration(ItemStack stack, Runnable render) {
-        ItemStack previous = RENDERED_ITEM.get();
-        RENDERED_ITEM.set(stack);
-        try {
-            render.run();
-        } finally {
-            if (previous == null) RENDERED_ITEM.remove();
-            else RENDERED_ITEM.set(previous);
-        }
+    public ITexture[] getTexturesInactive(ITexture baseTexture) {
+        return new ITexture[] { baseTexture, settings.overlay(false) };
     }
 
     @Override
-    public void loadNBTData(NBTTagCompound aNBT) {
-        super.loadNBTData(aNBT);
-        // 用 hasKey 守卫：缺键时保留构造默认值，而不是被 getInteger 的 0 静默顶成 ULV
-        if (aNBT.hasKey(NBT_STRUCTURE_TIER)) structureTier = clampTier(aNBT.getInteger(NBT_STRUCTURE_TIER));
-        if (aNBT.hasKey(NBT_ENERGY_TIER)) energyTier = clampTier(aNBT.getInteger(NBT_ENERGY_TIER));
-        if (aNBT.hasKey(NBT_AMPERAGE)) amperage = snapAmperage(aNBT.getInteger(NBT_AMPERAGE));
+    public void saveNBTData(NBTTagCompound tag) {
+        super.saveNBTData(tag);
+        settings.save(tag, false);
     }
 
-    /** 服务端 → 客户端：跟随 GT 的方块同步流。 */
+    @Override
+    public void setItemNBT(NBTTagCompound tag) {
+        super.setItemNBT(tag);
+        settings.save(tag, true);
+    }
+
+    @Override
+    public void loadNBTData(NBTTagCompound tag) {
+        super.loadNBTData(tag);
+        settings.load(tag);
+    }
+
     @Override
     public void writeToStream(ByteBuf buffer) {
         super.writeToStream(buffer);
-        buffer.writeInt(structureTier);
-        buffer.writeInt(energyTier);
-        buffer.writeInt(amperage);
+        settings.write(buffer);
     }
 
     @Override
     public void readFromStream(ByteBuf buffer) {
         super.readFromStream(buffer);
-        structureTier = clampTier(buffer.readInt());
-        energyTier = clampTier(buffer.readInt());
-        amperage = snapAmperage(buffer.readInt());
+        settings.read(buffer);
     }
-
-    // ------------------------------------------------------------------
-    // 信息显示
-    // ------------------------------------------------------------------
 
     @Override
     public boolean isGivingInformation() {
@@ -327,296 +127,37 @@ public class VariableEnergyHatch extends MTEHatchEnergy {
     }
 
     @Override
-    public void addAdditionalTooltipInformation(ItemStack stack, List<String> tooltip) {
-        int itemStructureTier = DEFAULT_STRUCTURE_TIER;
-        int itemEnergyTier = DEFAULT_ENERGY_TIER;
-        int itemAmperage = DEFAULT_AMPERAGE;
-        NBTTagCompound nbt = stack.getTagCompound();
-        if (nbt != null) {
-            if (nbt.hasKey(NBT_STRUCTURE_TIER)) itemStructureTier = clampTier(nbt.getInteger(NBT_STRUCTURE_TIER));
-            if (nbt.hasKey(NBT_ENERGY_TIER)) itemEnergyTier = clampTier(nbt.getInteger(NBT_ENERGY_TIER));
-            if (nbt.hasKey(NBT_AMPERAGE)) itemAmperage = snapAmperage(nbt.getInteger(NBT_AMPERAGE));
-        }
-        tooltip.add(EnumChatFormatting.GOLD + StatCollector.translateToLocal("gtvh.tooltip.configuration"));
-        tooltip.add(
-            EnumChatFormatting.GRAY + StatCollector
-                .translateToLocalFormatted("gtvh.tooltip.structure_tier", shortTierName(itemStructureTier)));
-        tooltip.add(
-            EnumChatFormatting.GRAY + StatCollector.translateToLocalFormatted(
-                "gtvh.tooltip.power_tier",
-                shortTierName(itemEnergyTier),
-                formatNumber(GTValues.V[itemEnergyTier])));
-        tooltip.add(
-            EnumChatFormatting.GRAY + StatCollector.translateToLocalFormatted("gtvh.tooltip.amperage", itemAmperage));
-    }
-
-    @Override
     public String[] getInfoData() {
-        return new String[] { "Structure tier: " + EnumChatFormatting.YELLOW + tierName(structureTier),
-            "Power tier: " + EnumChatFormatting.YELLOW
-                + tierName(energyTier)
-                + EnumChatFormatting.RESET
-                + " ("
-                + formatNumber(GTValues.V[energyTier])
-                + " EU/t)",
-            "Amperage: " + EnumChatFormatting.YELLOW
-                + amperage
-                + " A"
-                + EnumChatFormatting.RESET
-                + " (budget "
-                + formatNumber(GTValues.V[energyTier] * amperage)
-                + " EU/t)",
-            "Buffer: " + formatNumber(maxEUStore()) + " EU" };
+        return settings.info(false);
     }
 
-    // ------------------------------------------------------------------
-    // 交互与 GUI
-    // ------------------------------------------------------------------
+    @Override
+    public void addAdditionalTooltipInformation(ItemStack stack, List<String> tooltip) {
+        VariableHatchSettings.addItemTooltip(stack, tooltip, false);
+    }
 
     @Override
-    public boolean onRightclick(IGregTechTileEntity aBaseMetaTileEntity, EntityPlayer aPlayer) {
-        if (aBaseMetaTileEntity.isServerSide()) {
-            openGui(aPlayer);
-        }
+    public boolean onRightclick(IGregTechTileEntity base, EntityPlayer player) {
+        if (base.isServerSide()) openGui(player);
         return true;
     }
 
-    /**
-     * 窗口高度按"内容区 + 玩家背包"反推（见上方布局常量）。MUI1 的背景是可拉伸的九宫格
-     * （{@code BACKGROUND_SINGLEBLOCK_DEFAULT} 是 {@code AdaptableUITexture}），所以加高只影响
-     * 窗口尺寸，不会糊贴图；玩家背包由 GT 按窗口高度自动重新定位，无需手动摆放。
-     * 先例：{@code MTEHatchInputBusME.getGUIHeight()} 返回 179、{@code MTEMultiBlockBase} 用
-     * 198×192（后者还要自己挪背包，本仓不需要，因为默认的 marginBottom 落点正好就是常量里那个 83）。
-     */
     @Override
     public int getGUIHeight() {
-        return GUI_HEIGHT;
+        return VariableHatchSettings.GUI_HEIGHT;
     }
 
     @Override
     public void addUIWidgets(ModularWindow.Builder builder, UIBuildContext buildContext) {
         builder.setBackground(GTUITextures.BACKGROUND_SINGLEBLOCK_DEFAULT);
         builder.setGuiTint(getGUIColorization());
-
-        int y = CONTENT_TOP;
-
-        addSettingRow(
-            builder,
-            y,
-            "gtvh.gui.structure_tier",
-            this::structureTierDisplay,
-            this::structureTierTooltip,
-            (direction, shift) -> setStructureTier(structureTier + direction * (shift ? TIER_SHIFT_STEP : 1)));
-
-        y += ROW_BLOCK_HEIGHT + ROW_SPACING;
-
-        addSettingRow(
-            builder,
-            y,
-            "gtvh.gui.power_tier",
-            this::powerTierDisplay,
-            this::powerTierTooltip,
-            (direction, shift) -> setEnergyTier(energyTier + direction * (shift ? TIER_SHIFT_STEP : 1)));
-
-        y += ROW_BLOCK_HEIGHT + ROW_SPACING;
-
-        addSettingRow(
-            builder,
-            y,
-            "gtvh.gui.amperage",
-            this::amperageDisplay,
-            this::amperageTooltip,
-            (direction, shift) -> setAmperage(
-                shift ? (direction > 0 ? AMPERAGE_STEPS[AMPERAGE_STEPS.length - 1] : AMPERAGE_STEPS[0])
-                    : stepAmperage(amperage, direction)));
+        settings.addWidgets(builder, getGUIWidth(), false, structureChanged -> onSettingsChanged());
     }
-
-    /**
-     * 一组控件：标题在上，下面一行是 {@code [−][只读数值框][+]}，整行在窗口里水平居中。
-     * <p>
-     * 数值只能靠箭头改（数值框是 {@link TextWidget}，不是输入框），所以"控件显示的值"与
-     * "仓里存的值"不可能不一致 —— 这正是原来数字框 + 吸附要绕的那个坑。
-     */
-    private void addSettingRow(ModularWindow.Builder builder, int y, String labelKey, Supplier<String> display,
-        Supplier<List<String>> tooltip, Stepper stepper) {
-        final int rowX = (getGUIWidth() - ROW_WIDTH) / 2;
-        final int valueX = rowX + BUTTON_SIZE + BUTTON_GAP;
-
-        builder.widget(
-            TextWidget.localised(labelKey)
-                .setPos(valueX, y)
-                .setSize(VALUE_WIDTH, LABEL_HEIGHT))
-            .widget(stepButton(rowX, y, false, stepper, tooltip))
-            .widget(valueBox(display, tooltip, valueX, y))
-            .widget(stepButton(rowX + ROW_WIDTH - BUTTON_SIZE, y, true, stepper, tooltip));
-    }
-
-    /**
-     * 只读数值框：GT 文本框底图 + 居中白字。与原来的 {@code NumericWidget} 外观一致，但不可输入。
-     * <p>
-     * 用 {@link TextWidget#setStringSupplier} 而不是 DynamicTextWidget：前者只在客户端求值
-     * （MUI 的 javadoc 明说 supplier 只在客户端调用），值本身由 GT 原生同步流发送到客户端
-     * （见 {@code writeToStream}/{@code readFromStream}），所以改档后客户端能显示，
-     * 不需要额外的网络包，也不受滚轮影响。
-     */
-    private static TextWidget valueBox(Supplier<String> display, Supplier<List<String>> tooltip, int x, int y) {
-        TextWidget box = new TextWidget().setStringSupplier(display)
-            .setDefaultColor(Color.WHITE.normal)
-            .setTextAlignment(Alignment.Center);
-        // 这几个 setter 声明返回 Widget，会吃掉 TextWidget 的静态类型，故逐句调用
-        box.setSize(VALUE_WIDTH, VALUE_HEIGHT);
-        box.setBackground(GTUITextures.BACKGROUND_TEXT_FIELD);
-        // 提示内容含随档位变化的数值/预算，默认的缓存会让它停在第一次的值上
-        box.dynamicTooltip(tooltip)
-            .setUpdateTooltipEveryTick(true)
-            .setTooltipShowUpDelay(TOOLTIP_DELAY);
-        box.setPos(x, y);
-        return box;
-    }
-
-    /**
-     * 单步按钮：点击调一档（语义见 {@link Stepper}）。纹理用 GT 自己那套
-     * （{@code BUTTON_STANDARD} + 大号 −/+），与 {@code MTETeleporter}、{@code MTEHatchCraftingInputME}
-     * 的写法一致；点击会由 {@code SyncedWidget} 自动同步到服务端（两侧各跑一次同一段 setter）。
-     */
-    private static ButtonWidget stepButton(int x, int y, boolean up, Stepper stepper, Supplier<List<String>> tooltip) {
-        ButtonWidget button = new ButtonWidget()
-            .setOnClick((clickData, widget) -> stepper.step(up ? 1 : -1, clickData.shift));
-        button.setBackground(
-            GTUITextures.BUTTON_STANDARD,
-            up ? GTUITextures.OVERLAY_BUTTON_PLUS_LARGE : GTUITextures.OVERLAY_BUTTON_MINUS_LARGE);
-        button.setSize(BUTTON_SIZE, BUTTON_SIZE);
-        button.dynamicTooltip(tooltip)
-            .setUpdateTooltipEveryTick(true)
-            .setTooltipShowUpDelay(TOOLTIP_DELAY);
-        button.setPos(x, y);
-        return button;
-    }
-
-    /** 箭头点击语义：{@code direction} 为 +1/−1，{@code shift} 为是否按住 Shift */
-    @FunctionalInterface
-    private interface Stepper {
-
-        void step(int direction, boolean shift);
-    }
-
-    // ------------------------------------------------------------------
-    // GUI 文案（只在客户端求值）
-    // ------------------------------------------------------------------
-
-    /** 结构等级：「1 · LV」 */
-    private String structureTierDisplay() {
-        return structureTier + " · " + shortTierName(structureTier);
-    }
-
-    /** 供电等级：「2 · MV」 */
-    private String powerTierDisplay() {
-        return energyTier + " · " + shortTierName(energyTier);
-    }
-
-    /** 电流：「2 A」 */
-    private String amperageDisplay() {
-        return amperage + " A";
-    }
-
-    private List<String> structureTierTooltip() {
-        return Arrays.asList(
-            StatCollector.translateToLocalFormatted("gtvh.gui.structure_tier.tooltip", shortTierName(structureTier)),
-            StatCollector.translateToLocal("gtvh.gui.shift_hint.tier"));
-    }
-
-    private List<String> powerTierTooltip() {
-        return Arrays.asList(
-            StatCollector.translateToLocalFormatted(
-                "gtvh.gui.power_tier.tooltip",
-                shortTierName(energyTier) + " · " + formatNumber(GTValues.V[energyTier]) + " EU/t"),
-            StatCollector.translateToLocal("gtvh.gui.power_tier.tooltip.warn"),
-            StatCollector.translateToLocal("gtvh.gui.shift_hint.tier"));
-    }
-
-    private List<String> amperageTooltip() {
-        return Arrays.asList(
-            StatCollector.translateToLocalFormatted("gtvh.gui.amperage.tooltip", amperageDisplay()),
-            StatCollector.translateToLocal("gtvh.gui.shift_hint.amperage"));
-    }
-
-    // ------------------------------------------------------------------
-    // 内部工具
-    // ------------------------------------------------------------------
 
     private void onSettingsChanged() {
         IGregTechTileEntity base = getBaseMetaTileEntity();
-        if (base != null && base.isServerSide()) {
-            // 覆盖层贴图与信息面板依赖这两个值，推一次方块更新让客户端跟上
-            base.issueTileUpdate();
-            // issueTileUpdate 只走客户端同步（markBlockForUpdate），不标脏。
-            // 这三项要落盘（见 saveNBTData），不标脏则改档可能随 chunk 保存一起丢失
-            base.markDirty();
-        }
-    }
-
-    /**
-     * 三个 setter：夹取/吸附都在这里做，GUI 与 NBT 读档共用，所以不存在"控件显示的档位"
-     * 与"仓里存的档位"两个版本。箭头按到边界后再点只是重复写同一个值（无害：值是幂等的，
-     * 不会标脏出问题）。
-     */
-    private void setStructureTier(int tier) {
-        structureTier = clampTier(tier);
-        onSettingsChanged();
-    }
-
-    private void setEnergyTier(int tier) {
-        energyTier = clampTier(tier);
-        onSettingsChanged();
-    }
-
-    private void setAmperage(int value) {
-        amperage = snapAmperage(value);
-        onSettingsChanged();
-    }
-
-    private static int clampTier(int tier) {
-        return Math.max(MIN_TIER, Math.min(MAX_TIER, tier));
-    }
-
-    /** 电流值在 {@link #AMPERAGE_STEPS} 中的下标；值不在档位里时取最近的档位 */
-    private static int amperageIndex(int value) {
-        int best = 0;
-        int bestDistance = Integer.MAX_VALUE;
-        for (int i = 0; i < AMPERAGE_STEPS.length; i++) {
-            int distance = Math.abs(AMPERAGE_STEPS[i] - value);
-            if (distance < bestDistance) {
-                bestDistance = distance;
-                best = i;
-            }
-        }
-        return best;
-    }
-
-    /** 电流吸附到最近的合法档位（NBT 读档与同步流也走这里） */
-    private static int snapAmperage(int value) {
-        return AMPERAGE_STEPS[amperageIndex(value)];
-    }
-
-    /** 沿 AMPERAGE_STEPS 走一档（2→4→16→64），两端夹住不回绕 */
-    private static int stepAmperage(int current, int direction) {
-        int index = Math.max(0, Math.min(AMPERAGE_STEPS.length - 1, amperageIndex(current) + direction));
-        return AMPERAGE_STEPS[index];
-    }
-
-    /** 信息面板用的长名（"Ultra Low Voltage"）；本地化仍是待办，见 DESIGN.md 第 7 节 */
-    private static String tierName(int tier) {
-        if (tier >= 0 && tier < GTValues.VOLTAGE_NAMES.length) {
-            return GTValues.VOLTAGE_NAMES[tier];
-        }
-        return "Tier " + tier;
-    }
-
-    /** GUI 用的短名（ULV/LV/MV/…）。{@code GTValues.VN} 不带颜色码，白字在灰底上可读 */
-    private static String shortTierName(int tier) {
-        if (tier >= 0 && tier < GTValues.VN.length) {
-            return GTValues.VN[tier];
-        }
-        return "T" + tier;
+        if (base == null || !base.isServerSide()) return;
+        base.issueTileUpdate();
+        base.markDirty();
     }
 }
