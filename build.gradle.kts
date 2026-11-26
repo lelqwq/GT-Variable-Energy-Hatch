@@ -3,9 +3,9 @@ plugins {
     id("com.gtnewhorizons.gtnhconvention")
 }
 
-// jar 文件名（不改 modid）：gtvariablehatch-0.1.0.jar
+// jar 文件名（不改 modid）：gt-variable-hatch-0.1.0.jar
 base {
-    archivesName.set("gtvariablehatch")
+    archivesName.set("gt-variable-hatch")
 }
 
 // 版本来源：gradle.properties 的 RELEASE_VERSION。

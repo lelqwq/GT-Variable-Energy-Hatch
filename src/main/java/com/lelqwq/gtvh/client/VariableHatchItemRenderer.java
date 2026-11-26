@@ -23,9 +23,14 @@ public final class VariableHatchItemRenderer implements IItemRenderer {
 
     @Override
     public boolean handleRenderType(ItemStack stack, ItemRenderType type) {
-        int id = stack.getItemDamage();
-        return (id == MetaTileEntityID.VARIABLE_ENERGY_HATCH.ID || id == MetaTileEntityID.VARIABLE_DYNAMO_HATCH.ID)
-            && type != ItemRenderType.FIRST_PERSON_MAP;
+        return isVariableHatch(stack.getItemDamage()) && type != ItemRenderType.FIRST_PERSON_MAP;
+    }
+
+    private static boolean isVariableHatch(int id) {
+        for (MetaTileEntityID hatch : MetaTileEntityID.values()) {
+            if (id == hatch.ID) return true;
+        }
+        return false;
     }
 
     @Override

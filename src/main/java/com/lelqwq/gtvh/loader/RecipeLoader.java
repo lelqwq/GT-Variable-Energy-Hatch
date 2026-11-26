@@ -23,6 +23,8 @@ public final class RecipeLoader {
     public static void run() {
         register(MachineLoader.VARIABLE_ENERGY_HATCH, MetaTileEntityIDs.ENERGY_HATCH_LV);
         register(MachineLoader.VARIABLE_DYNAMO_HATCH, MetaTileEntityIDs.DYNAMO_HATCH_LV);
+        register(MachineLoader.VARIABLE_INPUT_HATCH, MetaTileEntityIDs.INPUT_HATCH_LV);
+        register(MachineLoader.VARIABLE_OUTPUT_HATCH, MetaTileEntityIDs.OUTPUT_HATCH_LV);
     }
 
     private static void register(IMetaTileEntity hatch, MetaTileEntityIDs baseHatchId) {

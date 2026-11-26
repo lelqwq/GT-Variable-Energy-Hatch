@@ -162,8 +162,7 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
 
 ## 6. 刻意不做
 
-- 不改 `mTier`；不做动力仓/输出侧；不做仓自取电；MT-3662 通过 Mixin 兼容；
-  单方块机器的超频不受本模组影响。
+- 不改 `mTier`；不做仓自取电；MT-3662 通过 Mixin 兼容；单方块机器的超频不受本模组影响。
 
 ## 7. 待办与未验证项
 
@@ -225,3 +224,41 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
 10. GTSWN 覆盖板贴在本仓上，配 V/A ≥ 预算 → 无线供电成立，网络按 (1+损耗) 扣账。
 11. GUI 布局：三组「标题 + 数字框」完整落在窗口上半部，**不压玩家背包**，背包 4 行全部可见可点
    （窗口 176×211，数值推导见第 2 节，仅经源码推算、未实机确认）。
+
+## 8. 可变液体仓（1.0.x）
+
+2.9.0 的两个基类已经把 GUI 迁到 MUI2，因此这两个方块也直接实现 MUI2，不复用能源仓的 MUI1 控件。
+
+| 方块 | 基类 | 模板 ID |
+|---|---|---|
+| 可变输入仓 | `MTEHatchInput` | `INPUT_HATCH_LV` |
+| 可变输出仓 | `MTEHatchOutput` | `OUTPUT_HATCH_LV` |
+
+**一个档位。** `MTEHatchInput/Output.getCapacity()` 是 `8000 * (1 << mTier)`；本模组把同一个可变结构等级
+同时喂给 `getTierForStructure()` 和 `getCapacity()`，与原版 `mTier` 的职责一致。容量减小时不裁剪
+`mFluid`，只是 `fill()` 因为剩余空间为负而返回 0。
+
+**MUI2 细节（5.09.54.265 源码）**
+
+- 两个基类都覆写 `useMui2() == true`，GUI 分别在
+  `gregtech/common/gui/modularui/hatch/MTEHatch{Input,Output}Gui`。
+- MUI2 没有"窗口高 + 坐标摆控件"那一套：`MTETieredMachineBlockBaseGui` 用 `Flow` 排版，内容区在
+  `createContentSection()`，底部两角在 `createBottomLeft/RightCornerFlow()`，面板高度由
+  `getBasePanelHeight()` 决定，玩家背包按 `height - 83` 贴在底部。本模组把档位行追加到底部左角 Flow，
+  并加高面板 24px。
+- 档位读写用 `IntSyncValue(getter, setter).allowC2S()` 注册到 `PanelSyncManager`；setter 在服务端执行，
+  调 `issueTileUpdate()` + `markDirty()`，并调 `GregTechAPI.causeMachineUpdate(...)` 让结构重检
+  （容量也随该档位变化，需要同步给客户端）。客户端读到的显示值来自 sync cache，罐容量等实际值
+  仍由 `writeToStream/readFromStream` 同步。
+- 材质：`MTEHatch.getTexture()` 用 `MACHINE_CASINGS[mTier]` 做底；沿用能源仓的
+  `replaceDefaultCasing()`，把 LV 外壳替换为结构等级的颜色。物品渲染继续通过
+  `VariableHatchSettings.renderItemWithConfiguration` 的 ThreadLocal 读物品 NBT。
+
+**仍受与能源仓相同的限制**：只有显式调用 `getTierForStructure()` 的结构过滤/检查会看到结构等级；
+直接比较 `mTier` 的代码看不到。液体仓没有对应 MT-3662 式的 Mixin 需求（认仓入口只做
+`instanceof`，见 `MTEMultiBlockBase.addInputHatchToMachineList` 等）。
+
+**为什么没有可变总线。** `CommonMetaTileEntity.mInventory` 是 `final ItemStack[]`，GUI 槽组、物品栏 handler
+与机器端遍历都围绕这个数组建立，运行期改不了长度；2.9.0 的 `MTEHatch.getSlots(tier)` 又是
+`(tier + 1)^2`（LV 4、MV 9、HV 16 …… UXV 196），固定容量无法体现档位、动态容量又需要大范围覆写
+输入/输出逻辑，因此只保留液体仓。

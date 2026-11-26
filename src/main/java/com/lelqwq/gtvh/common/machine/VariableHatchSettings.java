@@ -121,6 +121,11 @@ public final class VariableHatchSettings {
         if (tag.hasNoTags()) stack.setTagCompound(null);
     }
 
+    /** Item stack currently being rendered, if the item renderer is active on this thread. */
+    static ItemStack renderedItemStack() {
+        return RENDERED_ITEM.get();
+    }
+
     public static void renderItemWithConfiguration(ItemStack stack, Runnable render) {
         ItemStack previous = RENDERED_ITEM.get();
         RENDERED_ITEM.set(stack);

@@ -1,12 +1,13 @@
-# Variable Energy Hatch（可变能源仓）
+# Variable Hatch（可变仓室）
 
-一个 GTNH 2.9.0 / GT5U 5.09.54.265 的小型 addon：**一个方块顶掉能源仓的 tier 选择题**。GTNH 2.8.4 请使用 1.0.3。
+一个 GTNH 2.9.0 / GT5U 5.09.54.265 的小型 addon：**用可配置档位的仓室顶掉 tier 选择题**。GTNH 2.8.4 请使用 1.0.3。
 
 多方块只装一个能源仓、又想跑更高等级的配方时，原版的办法是拆机器换更高级的仓、或者堆更多仓。
 本模组把这件事收进一个方块：结构等级、供电等级、电流三项都在它自己的 GUI 里切。
 
 - **运行依赖**：GT5U 与 UniMixins；MT-3662 兼容补丁使用 Mixin，无自定义网络包。
-- **一个方块**：`Variable Energy Hatch`，继承 `MTEHatchEnergy`，因此任何接受普通能源仓的多方块都认它。
+- **能源仓**：`Variable Energy Hatch`，继承 `MTEHatchEnergy`，因此任何接受普通能源仓的多方块都认它。
+- **其余仓室**：可变动力仓、可变输入/输出仓，分别继承 GT 对应的仓室类。
 
 ## 使用方法
 
@@ -65,7 +66,7 @@
 
 ## 配方
 
-工作台 3×3，中心一件 **LV 能源仓**，四周 8 格 **原版拉杆**：
+工作台 3×3，中心一件对应的 **LV 原版仓室**，四周 8 格 **原版拉杆**：
 
 ```
 拉杆 拉杆 拉杆
@@ -73,8 +74,15 @@
 拉杆 拉杆 拉杆
 ```
 
-成本极低且 LV 就能做 —— 属于"早期就替代全部能源仓选择"的强力工具，这是刻意的设计取舍；
-若要加门槛，只改中心件为更高 tier 的能源仓即可（形状不用动）。
+| 产物 | 中心件 |
+|---|---|
+| 可变能源仓 | LV 能源仓 |
+| 可变动力仓 | LV 动力仓 |
+| 可变输入仓 | LV 输入仓 |
+| 可变输出仓 | LV 输出仓 |
+
+成本极低且 LV 就能做 —— 属于"早期就替代全部仓室选择"的强力工具，这是刻意的设计取舍；
+若要加门槛，只改中心件为更高 tier 的仓室即可（形状不用动）。
 
 ## 与 GT-Simple-Wireless-Network 的配合
 
@@ -92,22 +100,43 @@
 
 先停机再降低输出档位。GT 通用输出路径在动力仓总容量低于发电量时可能引发多方块爆炸，单 tick 实际注入量超过 2,147,483,647 EU 时也受其计数范围限制。拆下后保留设置，单独放入工作台可重置档位。
 
+## 可变输入/输出仓
+
+两种方块，同样用「LV 原版仓室 + 8 拉杆」合成：
+
+| 方块 | 可调项 | 容量 |
+|---|---|---|
+| 可变输入仓 | 结构等级 | 8000 L × 2^结构等级 |
+| 可变输出仓 | 结构等级 | 8000 L × 2^结构等级 |
+
+- 只有一个结构等级，它同时喂给 `getTierForStructure()` 和 `getCapacity()`
+  （`8000L << tier`，tier 0..13），与原版 `mTier` 的作用一致。降低档位不会删除罐里已有的液体，只是超出
+  新容量的部分无法继续填入。
+- 外壳颜色跟随结构等级；物品形态按物品 NBT 渲染。拆下后保留设置，单独放入工作台可重置档位
+  （同时保留覆盖板等物品数据）。
+- 直接读 `mTier` 而非 `getTierForStructure()` 的机器不会看到结构等级 —— 本仓的 `mTier` 恒为 LV。
+  GT++ 核反应堆等使用 `getTierForStructure()` 的检查则正常生效。
+- 2.9.0 中这两种原版仓室已迁移到 MUI2，本模组的 GUI 也基于 MUI2 原生控件实现。
+- 物品总线没有做：`CommonMetaTileEntity.mInventory` 是 final 数组，槽数不能在运行时增减；固定容量又无法
+  体现"可变档位"，因此只保留液体仓。
+
 ## 构建
 
 - **必须 Java 25**（`.java-version`）。
 - 编译目标 `GT5U 5.09.54.265`（GTNH 2.9.0）。
-- `./gradlew build`，产物 `build/libs/gtvariablehatch-<版本>.jar`（只发主 jar，不带 `-dev`/`-sources`）。
+- `./gradlew build`，产物 `build/libs/gt-variable-hatch-<版本>.jar`（只发主 jar，不带 `-dev`/`-sources`）。
 - **改版本时三处同改**：`gradle.properties` 的 `RELEASE_VERSION`、`src/main/resources/mcmod.info` 的 `version`、
   `@Mod` 注解（`Tags` 自动）。GTNH 模板**不替换** mcmod.info，游戏 Mods 界面显示的就是它，改完必须重编。
 
 ## 当前状态
 
-**构建产物**：`build/libs/gtvariablehatch-1.0.5.jar`，
-`Tags.VERSION` 与 `mcmod.info` 的版本均为 `1.0.5`。
+**构建产物**：`build/libs/gt-variable-hatch-1.1.0.jar`，
+`Tags.VERSION` 与 `mcmod.info` 的版本均为 `1.1.0`。
 
-已写：构建脚本、主类、MTE 本体（三个可调项 + 全部覆写 + NBT/同步流 + 信息面板 + GUI）、注册、配方、中英 lang、mcmod.info。
+已写：构建脚本、主类、四个 MTE 本体（能源仓/动力仓三个可调项；液体仓一个档位）、MUI2 GUI、
+NBT/同步流、信息面板、注册、配方、中英 lang、mcmod.info。
 
-**尚未验证**：2.9.0 游戏内启动、同步与机器运行行为。
+**尚未验证**：2.9.0 游戏内启动、MUI2 GUI 布局与同步、机器运行行为。
 
 信息面板里的 tier 名仍是 `GTValues.VOLTAGE_NAMES` 的英文长名（如 "Ultra Low Voltage"），
 中文客户端下这一项不本地化。
@@ -117,9 +146,13 @@
 ```
 src/main/java/com/lelqwq/gtvh/
 ├── GTVariableEnergyHatch.java              主类（preInit 构造 MTE，init 注册配方）
+├── client/                                 物品渲染、tooltip 清理
 ├── common/api/enums/MetaTileEntityID.java  MTE ID（BASE 15000，避开 GTSWN 的 14600 段）
-├── common/machine/VariableEnergyHatch.java 方块本体
-└── loader/{MachineLoader,RecipeLoader}.java
+├── common/gui/                             MUI2 GUI（两个液体仓）
+├── common/machine/                         四个方块本体与共享设置
+├── common/recipe/                          重置配方
+├── loader/{MachineLoader,RecipeLoader}.java
+└── mixins/                                 精密组装机、动力仓准入
 ```
 
 工程细节、GT5U 行号依据与未决项都在 [`DESIGN.md`](DESIGN.md)。

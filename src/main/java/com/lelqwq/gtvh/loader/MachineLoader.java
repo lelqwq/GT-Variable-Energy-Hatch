@@ -3,6 +3,8 @@ package com.lelqwq.gtvh.loader;
 import com.lelqwq.gtvh.common.api.enums.MetaTileEntityID;
 import com.lelqwq.gtvh.common.machine.VariableDynamoHatch;
 import com.lelqwq.gtvh.common.machine.VariableEnergyHatch;
+import com.lelqwq.gtvh.common.machine.VariableInputHatch;
+import com.lelqwq.gtvh.common.machine.VariableOutputHatch;
 
 /**
  * MTE 构造入口。
@@ -17,6 +19,8 @@ public final class MachineLoader {
     /** 可变能源仓单例（注册后由 GT 的 ItemMachines 以 damage = MTE ID 提供物品形态） */
     public static VariableEnergyHatch VARIABLE_ENERGY_HATCH;
     public static VariableDynamoHatch VARIABLE_DYNAMO_HATCH;
+    public static VariableInputHatch VARIABLE_INPUT_HATCH;
+    public static VariableOutputHatch VARIABLE_OUTPUT_HATCH;
 
     private MachineLoader() {}
 
@@ -29,5 +33,13 @@ public final class MachineLoader {
             MetaTileEntityID.VARIABLE_DYNAMO_HATCH.ID,
             "Variable Dynamo Hatch",
             "Variable Dynamo Hatch");
+        VARIABLE_INPUT_HATCH = new VariableInputHatch(
+            MetaTileEntityID.VARIABLE_INPUT_HATCH.ID,
+            "Variable Input Hatch",
+            "Variable Input Hatch");
+        VARIABLE_OUTPUT_HATCH = new VariableOutputHatch(
+            MetaTileEntityID.VARIABLE_OUTPUT_HATCH.ID,
+            "Variable Output Hatch",
+            "Variable Output Hatch");
     }
 }
