@@ -10,6 +10,7 @@ import net.minecraftforge.common.util.ForgeDirection;
 
 import com.gtnewhorizons.modularui.api.screen.ModularWindow;
 import com.gtnewhorizons.modularui.api.screen.UIBuildContext;
+import com.lelqwq.gtvh.common.api.interfaces.IMutableTier;
 
 import gregtech.api.GregTechAPI;
 import gregtech.api.gui.modularui.GTUITextures;
@@ -27,10 +28,12 @@ public class VariableDynamoHatch extends MTEHatchDynamo implements IHideTooltipE
 
     public VariableDynamoHatch(int id, String name, String regionalName) {
         super(id, name, regionalName, VariableHatchSettings.BASE_TIER, new String[0]);
+        applyPhysicalTier();
     }
 
     private VariableDynamoHatch(String name, String[] description, ITexture[][][] textures) {
         super(name, VariableHatchSettings.BASE_TIER, description, textures);
+        applyPhysicalTier();
     }
 
     @Override
@@ -107,6 +110,7 @@ public class VariableDynamoHatch extends MTEHatchDynamo implements IHideTooltipE
     public void loadNBTData(NBTTagCompound tag) {
         super.loadNBTData(tag);
         settings.load(tag);
+        applyPhysicalTier();
     }
 
     @Override
@@ -119,6 +123,7 @@ public class VariableDynamoHatch extends MTEHatchDynamo implements IHideTooltipE
     public void readFromStream(ByteBuf buffer) {
         super.readFromStream(buffer);
         settings.read(buffer);
+        applyPhysicalTier();
     }
 
     @Override
@@ -154,13 +159,17 @@ public class VariableDynamoHatch extends MTEHatchDynamo implements IHideTooltipE
         settings.addWidgets(builder, getGUIWidth(), true, this::onSettingsChanged);
     }
 
+    private void applyPhysicalTier() {
+        IMutableTier.applyTier(this, settings.powerTier());
+    }
+
     private void onSettingsChanged(boolean structureChanged) {
+        applyPhysicalTier();
         IGregTechTileEntity base = getBaseMetaTileEntity();
         if (base == null || !base.isServerSide()) return;
         base.issueTileUpdate();
         base.markDirty();
-        if (structureChanged) {
-            GregTechAPI.causeMachineUpdate(base.getWorld(), base.getXCoord(), base.getYCoord(), base.getZCoord());
-        }
+        // Output tier is mirrored into mTier, so all raw-tier consumers must rerun.
+        GregTechAPI.causeMachineUpdate(base.getWorld(), base.getXCoord(), base.getYCoord(), base.getZCoord());
     }
 }

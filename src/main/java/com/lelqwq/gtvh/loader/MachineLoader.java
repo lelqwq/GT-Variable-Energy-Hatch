@@ -4,6 +4,8 @@ import com.lelqwq.gtvh.common.api.enums.MetaTileEntityID;
 import com.lelqwq.gtvh.common.machine.VariableDynamoHatch;
 import com.lelqwq.gtvh.common.machine.VariableEnergyHatch;
 import com.lelqwq.gtvh.common.machine.VariableInputHatch;
+import com.lelqwq.gtvh.common.machine.VariableLaserSourceHatch;
+import com.lelqwq.gtvh.common.machine.VariableLaserTargetHatch;
 import com.lelqwq.gtvh.common.machine.VariableOutputHatch;
 
 /**
@@ -21,6 +23,8 @@ public final class MachineLoader {
     public static VariableDynamoHatch VARIABLE_DYNAMO_HATCH;
     public static VariableInputHatch VARIABLE_INPUT_HATCH;
     public static VariableOutputHatch VARIABLE_OUTPUT_HATCH;
+    public static VariableLaserSourceHatch VARIABLE_LASER_SOURCE_HATCH;
+    public static VariableLaserTargetHatch VARIABLE_LASER_TARGET_HATCH;
 
     private MachineLoader() {}
 
@@ -41,5 +45,13 @@ public final class MachineLoader {
             MetaTileEntityID.VARIABLE_OUTPUT_HATCH.ID,
             "Variable Output Hatch",
             "Variable Output Hatch");
+        VARIABLE_LASER_SOURCE_HATCH = new VariableLaserSourceHatch(
+            MetaTileEntityID.VARIABLE_LASER_SOURCE_HATCH.ID,
+            "Variable Laser Source Hatch",
+            "Variable Laser Source Hatch");
+        VARIABLE_LASER_TARGET_HATCH = new VariableLaserTargetHatch(
+            MetaTileEntityID.VARIABLE_LASER_TARGET_HATCH.ID,
+            "Variable Laser Target Hatch",
+            "Variable Laser Target Hatch");
     }
 }

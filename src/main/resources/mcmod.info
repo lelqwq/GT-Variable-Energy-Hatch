@@ -3,8 +3,8 @@
 	"modList": [{
 		"modid": "gtvariablehatch",
 		"name": "Variable Hatch",
-		"description": "Adds configurable energy/dynamo hatches and fluid input/output hatches for multiblocks.",
-		"version": "1.1.0",
+		"description": "Adds configurable energy/dynamo hatches, fluid hatches and laser hatches for multiblocks.",
+		"version": "1.2.0",
 		"mcversion": "1.7.10",
 		"url": "",
 		"updateUrl": "",
@@ -13,8 +13,8 @@
 		"logoFile": "",
 		"screenshots": [],
 		"parent": "",
-		"requiredMods": ["gregtech", "unimixins"],
-		"dependencies": ["gregtech", "unimixins"],
+		"requiredMods": ["gregtech", "unimixins", "tectech"],
+		"dependencies": ["gregtech", "unimixins", "tectech"],
 		"dependants": [],
 		"useDependencyInformation": false
 	}]

@@ -118,6 +118,8 @@ public final class VariableHatchSettings {
         tag.removeTag(NBT_STRUCTURE_TIER);
         tag.removeTag(NBT_ENERGY_TIER);
         tag.removeTag(NBT_AMPERAGE);
+        tag.removeTag("ratedAmperes");
+        tag.removeTag("workingAmperes");
         if (tag.hasNoTags()) stack.setTagCompound(null);
     }
 

@@ -22,9 +22,15 @@ public final class VariableHatchTooltipHandler {
         } else
             if (GTUtility.areStacksEqual(event.itemStack, MachineLoader.VARIABLE_DYNAMO_HATCH.getStackForm(1), true)) {
                 hatch = MachineLoader.VARIABLE_DYNAMO_HATCH;
-            } else {
-                return;
-            }
+            } else if (GTUtility
+                .areStacksEqual(event.itemStack, MachineLoader.VARIABLE_LASER_SOURCE_HATCH.getStackForm(1), true)) {
+                    hatch = MachineLoader.VARIABLE_LASER_SOURCE_HATCH;
+                } else if (GTUtility
+                    .areStacksEqual(event.itemStack, MachineLoader.VARIABLE_LASER_TARGET_HATCH.getStackForm(1), true)) {
+                        hatch = MachineLoader.VARIABLE_LASER_TARGET_HATCH;
+                    } else {
+                        return;
+                    }
         IGregTechTileEntity template = hatch.getBaseMetaTileEntity();
         event.toolTip.remove(
             StatCollector.translateToLocalFormatted(

@@ -11,6 +11,7 @@ import com.cleanroommc.modularui.factory.PosGuiData;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.UISettings;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
+import com.lelqwq.gtvh.common.api.interfaces.IMutableTier;
 import com.lelqwq.gtvh.common.gui.VariableOutputHatchGui;
 
 import gregtech.api.GregTechAPI;
@@ -32,10 +33,12 @@ public class VariableOutputHatch extends MTEHatchOutput implements VariableTiere
 
     public VariableOutputHatch(int id, String name, String regionalName) {
         super(id, name, regionalName, VariableHatchSettings.BASE_TIER, new String[0], 4);
+        applyPhysicalTier();
     }
 
     private VariableOutputHatch(String name, String[] description, ITexture[][][] textures) {
         super(name, VariableHatchSettings.BASE_TIER, description, textures);
+        applyPhysicalTier();
     }
 
     @Override
@@ -93,6 +96,7 @@ public class VariableOutputHatch extends MTEHatchOutput implements VariableTiere
     public void loadNBTData(NBTTagCompound tag) {
         super.loadNBTData(tag);
         settings.load(tag);
+        applyPhysicalTier();
     }
 
     @Override
@@ -105,6 +109,7 @@ public class VariableOutputHatch extends MTEHatchOutput implements VariableTiere
     public void readFromStream(ByteBuf buffer) {
         super.readFromStream(buffer);
         settings.read(buffer);
+        applyPhysicalTier();
     }
 
     @Override
@@ -127,7 +132,12 @@ public class VariableOutputHatch extends MTEHatchOutput implements VariableTiere
         return new VariableOutputHatchGui(this).build(guiData, syncManager, uiSettings);
     }
 
+    private void applyPhysicalTier() {
+        IMutableTier.applyTier(this, settings.structureTier());
+    }
+
     private void onSettingsChanged(boolean structureChanged) {
+        applyPhysicalTier();
         IGregTechTileEntity base = getBaseMetaTileEntity();
         if (base == null || !base.isServerSide()) return;
         base.issueTileUpdate();

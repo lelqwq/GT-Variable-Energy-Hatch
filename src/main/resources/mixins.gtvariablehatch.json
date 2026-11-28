@@ -5,5 +5,5 @@
   "refmap": "mixins.gtvariablehatch.refmap.json",
   "target": "@env(DEFAULT)",
   "compatibilityLevel": "JAVA_8",
-  "mixins": ["MixinPreciseAssembler", "MixinDynamoHatchAdmission"]
+  "mixins": ["MixinPreciseAssembler", "MixinDynamoHatchAdmission", "MixinMTETieredMachineBlock"]
 }

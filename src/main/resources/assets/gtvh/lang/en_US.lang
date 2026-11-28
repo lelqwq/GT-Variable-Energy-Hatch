@@ -38,3 +38,22 @@ gtvh.info.buffer=Buffer: %s EU
 gtvh.gui.fluid_capacity.tooltip=Capacity %s L
 gtvh.tooltip.fluid_tier=Structure tier: %s (%s L)
 gtvh.tooltip.fluid_capacity=Capacity: %s L
+
+gt.blockmachines.variable_laser_source_hatch.name=Variable Laser Source Hatch
+gt.blockmachines.variable_laser_target_hatch.name=Variable Laser Target Hatch
+
+gtvh.gui.laser_rated_short=Rated
+gtvh.gui.working_amperage=Working current
+gtvh.gui.laser_tier.tooltip=Tier %s (%s EU/t)
+gtvh.gui.laser_tier.shift=Shift + click = change 4 tiers
+gtvh.gui.laser_rated.tooltip=Rated current %s A (vanilla-legal combination)
+gtvh.gui.laser_rated.shift=Shift + click = jump to the tier's min/max rated current
+gtvh.gui.laser_working.tooltip=Working current %s A (0..rated)
+gtvh.gui.laser_working.throughput=Nominal throughput %s EU/t
+
+gtvh.description.laser_source=Laser source hatch. Emits EU to a matching laser target hatch.
+gtvh.description.laser_target=Laser target hatch. Receives EU from a matching laser source hatch.
+gtvh.tooltip.laser_rated=Rated current: %s A
+gtvh.tooltip.laser_working=Working current: %s A
+gtvh.tooltip.laser_throughput=Nominal throughput: %s EU/t
+gtvh.tooltip.laser_warning=Source and target tiers must match. A stronger source explodes the target; a weaker source does not transfer.

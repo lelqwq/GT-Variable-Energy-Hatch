@@ -5,9 +5,9 @@
 多方块只装一个能源仓、又想跑更高等级的配方时，原版的办法是拆机器换更高级的仓、或者堆更多仓。
 本模组把这件事收进一个方块：结构等级、供电等级、电流三项都在它自己的 GUI 里切。
 
-- **运行依赖**：GT5U 与 UniMixins；MT-3662 兼容补丁使用 Mixin，无自定义网络包。
+- **运行依赖**：GT5U、Tectech 与 UniMixins；兼容补丁和可变 tier 字段使用 Mixin，无自定义网络包。
 - **能源仓**：`Variable Energy Hatch`，继承 `MTEHatchEnergy`，因此任何接受普通能源仓的多方块都认它。
-- **其余仓室**：可变动力仓、可变输入/输出仓，分别继承 GT 对应的仓室类。
+- **其余仓室**：可变动力仓、可变输入/输出仓、可变激光源仓/靶仓，分别继承 GT/Tectech 对应的仓室类。
 
 ## 使用方法
 
@@ -42,9 +42,9 @@
 | 大型流体提取机 | 玻璃低于 UEV 时，仓 tier **≤** 玻璃 tier | `MTELargeFluidExtractor.java:177` |
 | gtpp 化工厂 / 精炼厂 / 核反应堆 | 只影响结构提示与自动放置，不影响成型 | `hatchItemFilterAnd(filterByMTETier(...))` |
 
-两个改不动的反例：GT 自家聚变 MK1/2/3 **直接比较 `mTier`**（`MTEFusionComputer.java:233`），本仓的 `mTier`
-恒为 LV，在那三台上会被无条件拒绝；虫洞发生器只收 tectech 的 `MTEHatchEnergyMulti`
-（`MTEWormholeGenerator.java:275`），根本装不进去。这两处不是结构等级能救的。
+GT 自家聚变 MK1/2/3 **直接比较 `mTier`**（`MTEFusionComputer.java:233`）。本模组现在把
+`mTier` 同步成**供电等级**，所以只要供电等级达到聚变要求就能进入；调结构等级仍然无效，需要调供电等级。
+虫洞发生器只收 tectech 的 `MTEHatchEnergyMulti`（`MTEWormholeGenerator.java:275`），可变能源仓仍然装不进去。
 
 ## 四条必须知道的限制
 
@@ -53,10 +53,10 @@
 2. **多数机器单仓时电流档位不生效**。GT 的 `setProcessingLogicPower` 在"恰好一个能源仓且无 exotic 仓"时
    把可用电流硬写成 1A（`MTEMultiBlockBase.java:1021`）。此时预算 = 供电等级 × 1A，与电流档位无关。
    电流要参与预算，机器上得有 ≥2 个能源仓（或另有 exotic 仓）。MT-3662 的兼容补丁允许单个可变仓使用设定电流，并在计算电压时读取当前供电等级；机器外壳的电压限制仍然有效。
-3. **结构等级只在少数机器上生效，GT 自家聚变族则完全不接受本仓**。生效范围见上表；在 EBF、LCR 这类
-   机器上拨它不会有任何变化 —— 那不是坏了，是这台机器本来就不看。而在 GT 聚变 MK1/2/3 上，本仓会被
-   **无条件拒绝**（那三台读 `mTier`，而 `mTier` 恒为 LV 且是 final 字段），调结构等级没有用
-   —— 聚变请用原版能源仓。结构检查失败的表现是回到未成型状态（方块保留），把值调回去即恢复。
+3. **结构等级只在少数机器上生效**。生效范围见上表；在 EBF、LCR 这类机器上拨它不会有任何变化 ——
+   那不是坏了，是这台机器本来就不看。GT 聚变 MK1/2/3 读的是 `mTier`，现在 `mTier` 跟随**供电等级**，
+   所以需要把供电等级调到聚变要求以上，而不是调结构等级。结构检查失败的表现是回到未成型状态
+   （方块保留），把值调回去即恢复。
 4. **多个可变仓混用不同供电等级会让预算失真**。GT 的预算是「各能源仓电压的**平均值** × 合计工作电流」，
    不是各仓之和。例：LV@64A + EV@2A 会被算成 1040V × 66A = 68,640 EU/t，而这两个仓实际上最多只能
    收下约 6,700 EU/t（各受自己的电压 × `maxAmperesIn()` 限制，还没算线缆载流）
@@ -80,6 +80,8 @@
 | 可变动力仓 | LV 动力仓 |
 | 可变输入仓 | LV 输入仓 |
 | 可变输出仓 | LV 输出仓 |
+| 可变激光源仓 | IV 256A 激光源仓 |
+| 可变激光靶仓 | IV 256A 激光靶仓 |
 
 成本极低且 LV 就能做 —— 属于"早期就替代全部仓室选择"的强力工具，这是刻意的设计取舍；
 若要加门槛，只改中心件为更高 tier 的仓室即可（形状不用动）。
@@ -114,11 +116,28 @@
   新容量的部分无法继续填入。
 - 外壳颜色跟随结构等级；物品形态按物品 NBT 渲染。拆下后保留设置，单独放入工作台可重置档位
   （同时保留覆盖板等物品数据）。
-- 直接读 `mTier` 而非 `getTierForStructure()` 的机器不会看到结构等级 —— 本仓的 `mTier` 恒为 LV。
-  GT++ 核反应堆等使用 `getTierForStructure()` 的检查则正常生效。
+- 液体仓的 `mTier` 也会同步成结构等级，所以直接读 `mTier` 的机器（如 GT++ 化工厂的外壳等级检查）
+  看到的是正确等级，而不是隐藏的 LV。
 - 2.9.0 中这两种原版仓室已迁移到 MUI2，本模组的 GUI 也基于 MUI2 原生控件实现。
 - 物品总线没有做：`CommonMetaTileEntity.mInventory` 是 final 数组，槽数不能在运行时增减；固定容量又无法
   体现"可变档位"，因此只保留液体仓。
+
+## 可变激光源仓 / 激光靶仓
+
+工作台：中心放对应的**原版 IV 256A 激光源仓/激光靶仓**，四周 8 个拉杆。
+
+- **结构等级**：按钮在 IV–UXV 间切换，Shift 一次 4 级。
+- **额定电流**：按钮只能选当前等级在原版存在的组合 —— IV 仅 256A；LuV 256/1024A；
+  ZPM 再加 4096A…… UXV 最多 1048576A。
+- **工作电流**：沿用原版 MUI2 数字输入框，范围 `0..额定`；可以键入 300A 这类任意值，
+  滚轮步长与原版一致（1 / 64 / 4 / 16）。改额定或降 tier 时会自动夹取。
+- **源仓与靶仓的 tier 必须一致**：源仓高于靶仓会炸掉靶仓；低于靶仓则完全不传输。
+- 所有可变仓的 `mTier` 都会同步成实际工作等级（能源/动力仓用供电/输出等级，液体/激光仓用结构等级），
+  所以工业激光雕刻机、虫洞发生器、精密自动组装机、GT++ 能量缓冲器等直接读 `mTier` 的机器都能看到真实等级。
+- 原版结构限制照旧：玻璃 tier ≥ 激光仓 tier；部分机器玻璃低于 UV 时直接拒绝激光仓；
+  激光雕刻机使用 multi-amp 能源时要求源仓 ≥ UEV。
+- 拆下后保留 tier / 额定电流 / 工作电流，工作台单独放置可重置；传奇激光仓不纳入常规组合。
+- 运行需要 Tectech；目标仓通过 `ExoticEnergy`、源仓通过 `LaserSource`/`ExoticDynamo` 接入。
 
 ## 构建
 
@@ -130,13 +149,13 @@
 
 ## 当前状态
 
-**构建产物**：`build/libs/gt-variable-hatch-1.1.0.jar`，
-`Tags.VERSION` 与 `mcmod.info` 的版本均为 `1.1.0`。
+**构建产物**：`build/libs/gt-variable-hatch-1.2.0.jar`，
+`Tags.VERSION` 与 `mcmod.info` 的版本均为 `1.2.0`。
 
-已写：构建脚本、主类、四个 MTE 本体（能源仓/动力仓三个可调项；液体仓一个档位）、MUI2 GUI、
+已写：构建脚本、主类、六个 MTE 本体（能源仓/动力仓三个可调项；液体仓一个档位；激光源仓/靶仓按原版矩阵调 tier 与电流）、MUI2 GUI、
 NBT/同步流、信息面板、注册、配方、中英 lang、mcmod.info。
 
-**尚未验证**：2.9.0 游戏内启动、MUI2 GUI 布局与同步、机器运行行为。
+**尚未验证**：2.9.0 游戏内启动、MUI2 GUI 布局与同步、激光链路与 mTier Mixin 运行行为。
 
 信息面板里的 tier 名仍是 `GTValues.VOLTAGE_NAMES` 的英文长名（如 "Ultra Low Voltage"），
 中文客户端下这一项不本地化。
@@ -148,11 +167,11 @@ src/main/java/com/lelqwq/gtvh/
 ├── GTVariableEnergyHatch.java              主类（preInit 构造 MTE，init 注册配方）
 ├── client/                                 物品渲染、tooltip 清理
 ├── common/api/enums/MetaTileEntityID.java  MTE ID（BASE 15000，避开 GTSWN 的 14600 段）
-├── common/gui/                             MUI2 GUI（两个液体仓）
-├── common/machine/                         四个方块本体与共享设置
+├── common/gui/                             MUI2 GUI（液体仓、激光仓）
+├── common/machine/                         六个方块本体与共享设置
 ├── common/recipe/                          重置配方
 ├── loader/{MachineLoader,RecipeLoader}.java
-└── mixins/                                 精密组装机、动力仓准入
+└── mixins/                                 精密组装机、动力仓准入、可变 mTier
 ```
 
 工程细节、GT5U 行号依据与未决项都在 [`DESIGN.md`](DESIGN.md)。

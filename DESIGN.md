@@ -116,19 +116,22 @@ GT 默认窗口是 176×166（`IMetaTileEntity.getGUIWidth/getGUIHeight` 的默�
 | `MTELargeFluidExtractor.java:177` | 玻璃 tier < UEV 时，仓 tier > 玻璃 tier → 结构不成立 | **生效**（上界约束） |
 | `GTStructureUtility.java:756`（经 item filter） | 只影响提示 / 自动放置 | 不参与成型 |
 | gtpp 化工厂 / 精炼厂 / 核反应堆 | 同上；`:179-196` 查的是 dynamo 与输入/输出仓，不是能源仓 | 不参与成型 |
-| `MTEFusionComputer.java:233` | 不用 `getTierForStructure()`，**直接比 `mTier`** | **无条件被拒**（本仓 `mTier` 恒为 LV） |
-| `MTEWormholeGenerator.java:275` | 只把 `MTEHatchEnergyMulti` 认作能源仓 | 根本装不进去 |
+| `MTEFusionComputer.java:233` | 不用 `getTierForStructure()`，**直接比 `mTier`** | 现在 `mTier = 供电等级`；供电等级达到要求即可进入，结构等级不参与 |
+| `MTEWormholeGenerator.java:275` | 只把 `MTEHatchEnergyMulti` 认作能源仓 | 可变能源仓仍然装不进去 |
 
-结论：结构等级对 EBF/LCR 这类机器是空操作；对 GT 自家聚变族则完全无能为力 —— 那三台读 `mTier`，
-而 `mTier` 是 final 字段，正是本模组刻意不改的东西。这是"不反射改 final 字段"取舍的代价。
+结论：结构等级对 EBF/LCR 这类机器是空操作；GT 自家聚变族通过 `mTier` 判定，而 `mTier` 现在镜像供电等级，
+所以聚变看的是**供电等级**，不是结构等级。
 
-**为什么不用反射改 `mTier`**：`mTier` 是 final 字段，上游唯一先例是
-`tectech/util/TTUtility.java:50-68` 的反射改写，且那段代码自带
-`// TODO why is it using reflection to change a final field from GREGTECH ?`。
-本模组改为覆写影响行为的读者（`maxEUInput()`、`getTierForStructure()`、`getInputTier()`），不碰 final 字段。
-`getOutputTier()` 与 `getTileEntityBaseType()` 仍读到 `mTier`（恒为 LV），但本仓没有输出侧
-（`isEnetOutput()` 为 false）、扳手等级也无实际影响，故不覆写 —— 覆写它们只是让注释更好看，
-不改变任何行为。
+**为什么现在改 `mTier`**：GT 里有多处直接读 `mTier`（聚变、PSS、化工厂、等离子锻炉、电动聚爆等），
+只覆写 `maxEUInput()` / `getTierForStructure()` / `getInputTier()` 无法让它们看到配置值。
+本模组新增 `MixinMTETieredMachineBlock`，把 `MTETieredMachineBlock.mTier` 变成可写，并让所有可变仓在构造、
+NBT 载入、网络同步和 GUI 改档时写入**实际工作等级**：
+
+- 能源仓 / 动力仓：`mTier = 供电 / 输出等级`（电压等级）；
+- 液体仓 / 激光仓：`mTier = 结构等级`。
+
+结构等级仍通过 `getTierForStructure()` 单独暴露，因此玻璃、goodgenerator 聚变等结构约束不受影响。
+所有 Mixin 只写本模组自己的仓，不影响其他 MTE 的 `mTier`。
 
 **外壳贴图**：装入多方块时 `addEnergyInputToMachineList` 会调 `hatch.updateTexture(aBaseCasingIndex)`
 （`MTEMultiBlockBase.java:2006-2009`），把外壳换成**机器**的外壳（`MTEHatch.java:59-80` 走
@@ -156,13 +159,14 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
 4. 多个可变仓混用不同供电等级 → 预算按各仓电压的**平均值** × ΣA 算（不是各仓之和），
    可能远高于线缆实际能供的电；机器选中跑不动的配方后**卡住不动且无任何诊断**。
    多个可变仓应设成同一供电等级（见第 3 节"预算到底怎么算"）。
-5. GT 自家聚变 MK1/2/3 与虫洞发生器**不接受本仓**：前者直接比较 `mTier`（`MTEFusionComputer.java:233`），
-   本仓 `mTier` 恒为 LV（final，刻意不改）→ 无条件被拒，调结构等级无效；后者只把
-   `MTEHatchEnergyMulti` 认作能源仓（`MTEWormholeGenerator.java:275`）。这两处请用原版/tectech 仓。
+5. 虫洞发生器只把 `MTEHatchEnergyMulti` 认作能源仓（`MTEWormholeGenerator.java:275`），可变能源仓
+   仍然装不进去。GT 聚变 MK1/2/3 直接比较 `mTier`，而 `mTier` 现在跟随供电等级，所以供电等级达到
+   聚变要求即可进入；降供电等级会重新触发结构检查并可能退回未成型。
 
 ## 6. 刻意不做
 
-- 不改 `mTier`；不做仓自取电；MT-3662 通过 Mixin 兼容；单方块机器的超频不受本模组影响。
+- 不改结构等级与供电等级互相独立的语义；`mTier` 仅作为运行等级镜像（见 §3）；不做仓自取电；
+  MT-3662 通过 Mixin 兼容；单方块机器的超频不受本模组影响。
 
 ## 7. 待办与未验证项
 
@@ -213,7 +217,8 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
 4. 两个可变仓、**设成同一供电等级**：电流档位生效，预算 = `V × ΣA`（两仓同为 A 档即 `V × 2A`）。
    再把两仓故意设成不同供电等级，确认出现「配方选中但卡住」的失真现象（限制 4）。
 5. 结构（一次验完第 3 节的结论）：EBF —— 结构等级拨到任何值都应通过（EBF 不看仓 tier）；
-   goodgenerator 大型聚变 —— 低于它要求的 tier 应被拒，调到要求值应通过；GT 聚变 MK1 —— 任何值都应被拒。
+   goodgenerator 大型聚变 —— 结构等级低于它要求的 tier 应被拒，调到要求值应通过；
+   GT 聚变 MK1 —— 供电等级低于要求应被拒、调到要求值应通过（mTier 跟随供电等级，结构等级不参与）。
 6. 结构重检：在大型流体提取机里把结构等级调到高于玻璃 tier → 结构应失效；调回 → 恢复
    （依赖 GT 自身的周期结构重检：`onPostTick` 里 `mUpdate` 每 50 tick 触发一次 `checkStructure`，
    `MTEMultiBlockBase.java:589-593`）。
@@ -254,11 +259,55 @@ texturePage 分支）。所以成型后 tier 的可视线索是**覆盖层配色
   `replaceDefaultCasing()`，把 LV 外壳替换为结构等级的颜色。物品渲染继续通过
   `VariableHatchSettings.renderItemWithConfiguration` 的 ThreadLocal 读物品 NBT。
 
-**仍受与能源仓相同的限制**：只有显式调用 `getTierForStructure()` 的结构过滤/检查会看到结构等级；
-直接比较 `mTier` 的代码看不到。液体仓没有对应 MT-3662 式的 Mixin 需求（认仓入口只做
-`instanceof`，见 `MTEMultiBlockBase.addInputHatchToMachineList` 等）。
+液体仓的 `mTier` 也同步为结构等级（见 §3 的统一处理），所以化工厂等直接读 `mTier` 的机器能看到正确等级。
+液体仓没有对应 MT-3662 式的 Mixin 需求（认仓入口只做 `instanceof`，见
+`MTEMultiBlockBase.addInputHatchToMachineList` 等）。
 
 **为什么没有可变总线。** `CommonMetaTileEntity.mInventory` 是 `final ItemStack[]`，GUI 槽组、物品栏 handler
 与机器端遍历都围绕这个数组建立，运行期改不了长度；2.9.0 的 `MTEHatch.getSlots(tier)` 又是
 `(tier + 1)^2`（LV 4、MV 9、HV 16 …… UXV 196），固定容量无法体现档位、动态容量又需要大范围覆写
 输入/输出逻辑，因此只保留液体仓。
+
+## 9. 可变激光源仓 / 激光靶仓
+
+2.9.0 的激光仓是 Tectech 的 `MTEHatchDynamoTunnel`（Laser Source）和
+`MTEHatchEnergyTunnel`（Laser Target），随 GT5U 5.09.54.265 一起提供。本模组直接继承它们：
+
+| 方块 | 基类 | ID |
+|---|---|---|
+| 可变激光源仓 | `MTEHatchDynamoTunnel` | 15006 |
+| 可变激光靶仓 | `MTEHatchEnergyTunnel` | 15007 |
+
+**档位。** tier 限制在 IV–UXV。原版每个 tier 可用的额定电流是一张固定矩阵（IV 只有 256A；
+LuV 256/1024；ZPM 再加 4096；…… UXV 到 1048576）。GUI 的额定电流按钮只遍历当前 tier 的合法值，
+切 tier 时自动夹到该 tier 最大值。工作电流沿用原版文本框（`TextFieldWidget.numbersInt(0, 额定)`，
+滚轮 1/64/4/16），允许 0–额定之间的任意整数，包括 300A。
+
+**隐藏 mTier 与可变字段 Mixin。** 构造时基类 tier 固定为 IV，`maxAmperes` 固定为 1 048 576（全局上限）；
+所有对外方法（`getTierForStructure`、`getInputTier`/`getOutputTier`、`maxEUInput`/`maxEUOutput`、
+`maxEUStore`、`getMinimumStoredEU`、材质/描述/名称）都走配置对象。但以下代码直接读 `mTier` 字段：
+
+- `MTEIndustrialLaserEngraver`：UEV 门槛、玻璃检查、最大超频数（其中一处还在匿名 ProcessingLogic 内）；
+- `MTEWormholeGenerator`：`V[hatch.mTier]` 计算传输上限（结构同时接受源仓和靶仓）；
+- `MTEPreciseAssembler`：exotic energy hatch 的 tier 取最大值；
+- GT++ `MTEPowerSubStation`：multi-amp 能量/动力仓的 tier 检查与电压求和；
+- `MTEElectricImplosionCompressor`：读取后未使用。
+
+因此新增 `MixinMTETieredMachineBlock`：用 `@Shadow @Final @Mutable` 把
+`MTETieredMachineBlock.mTier` 变成可写，并通过 `IMutableTier` 暴露 setter。现在**所有可变仓**都在构造、
+NBT 载入、网络同步和 GUI 改档时把实际工作等级写回 `mTier`：能源/动力仓写供电/输出等级，液体/激光仓写结构等级。
+上述机器以及聚变、PSS、化工厂、等离子锻炉等都能看到真实等级，不再需要逐机器 Mixin。
+这不会改变任何其他 MTE 的 `mTier` 值。
+
+**激光链路。** 完全沿用原版：源仓每 20 tick 沿正面扫描最多 1000 格、同色、可穿激光管/镜子；
+源仓电压必须等于靶仓 `maxEUInput` 才传输，高于会炸靶仓，低于则不传输。靶仓仍每秒扣 `Amperes` EU。
+源仓/靶仓的 tier 由玩家各自设置，必须一致。
+
+**GUI。** MUI2 自建内容区（不复用原版隧道 GUI 的电流文本框）：结构等级按钮、额定电流按钮、
+工作电流文本框。sync 用三个 `IntSyncValue`；改 tier 时把额定/工作电流夹取后一并回写，改额定时夹工作电流；
+所有改动在服务端 `issueTileUpdate` + `markDirty` + `causeMachineUpdate`，让雕刻机/蚀刻阵列等缓存的
+`laserTier`/`laserAmps` 重新读取。
+
+**物品与配方。** 中心件是对应原版 IV 256A 激光仓，四周 8 拉杆。`setItemNBT` 保存
+`structureTier` / `ratedAmperes` / `workingAmperes`，拆下保留、工作台重置；tooltip/渲染按物品 NBT。
+传奇激光仓（UXV、约 5.37 亿安培）是独立特殊物品，不纳入常规矩阵。

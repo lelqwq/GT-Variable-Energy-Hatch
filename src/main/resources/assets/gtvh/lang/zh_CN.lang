@@ -35,3 +35,22 @@ gtvh.info.buffer=储能容量：%s EU
 gtvh.gui.fluid_capacity.tooltip=容量 %s L
 gtvh.tooltip.fluid_tier=结构等级：%s（容量 %s L）
 gtvh.tooltip.fluid_capacity=容量：%s L
+
+gt.blockmachines.variable_laser_source_hatch.name=可变激光源仓
+gt.blockmachines.variable_laser_target_hatch.name=可变激光靶仓
+
+gtvh.gui.laser_rated_short=额定
+gtvh.gui.working_amperage=工作电流
+gtvh.gui.laser_tier.tooltip=结构等级 %s（电压 %s EU/t）
+gtvh.gui.laser_tier.shift=Shift + 点击箭头 = 一次调 4 级
+gtvh.gui.laser_rated.tooltip=额定电流 %s A（原版合法组合）
+gtvh.gui.laser_rated.shift=Shift + 点击箭头 = 跳到本等级的最小/最大额定电流
+gtvh.gui.laser_working.tooltip=工作电流 %s A（0..额定）
+gtvh.gui.laser_working.throughput=标称吞吐 %s EU/t
+
+gtvh.description.laser_source=激光源仓，向匹配的激光靶仓供能。
+gtvh.description.laser_target=激光靶仓，从匹配的激光源仓接收能量。
+gtvh.tooltip.laser_rated=额定电流：%s A
+gtvh.tooltip.laser_working=工作电流：%s A
+gtvh.tooltip.laser_throughput=标称吞吐：%s EU/t
+gtvh.tooltip.laser_warning=源仓与靶仓的 tier 必须一致；源仓更高会炸靶仓，更低则无法传输。

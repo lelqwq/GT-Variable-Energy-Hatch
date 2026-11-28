@@ -21,6 +21,10 @@ public enum MetaTileEntityID {
     VARIABLE_INPUT_HATCH(4),
     /** 可变输出仓 */
     VARIABLE_OUTPUT_HATCH(5),
+    /** 可变激光源仓 */
+    VARIABLE_LASER_SOURCE_HATCH(6),
+    /** 可变激光靶仓 */
+    VARIABLE_LASER_TARGET_HATCH(7),
 
     ;
 

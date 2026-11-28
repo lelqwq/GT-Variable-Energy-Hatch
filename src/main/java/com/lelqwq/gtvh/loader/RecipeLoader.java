@@ -25,6 +25,8 @@ public final class RecipeLoader {
         register(MachineLoader.VARIABLE_DYNAMO_HATCH, MetaTileEntityIDs.DYNAMO_HATCH_LV);
         register(MachineLoader.VARIABLE_INPUT_HATCH, MetaTileEntityIDs.INPUT_HATCH_LV);
         register(MachineLoader.VARIABLE_OUTPUT_HATCH, MetaTileEntityIDs.OUTPUT_HATCH_LV);
+        register(MachineLoader.VARIABLE_LASER_SOURCE_HATCH, MetaTileEntityIDs.IV256AtLaserSourceHatch);
+        register(MachineLoader.VARIABLE_LASER_TARGET_HATCH, MetaTileEntityIDs.IV256AtLaserTargetHatch);
     }
 
     private static void register(IMetaTileEntity hatch, MetaTileEntityIDs baseHatchId) {
